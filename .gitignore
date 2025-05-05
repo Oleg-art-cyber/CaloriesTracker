@@ -1,0 +1,10 @@
+# зависимости и сборка
+node_modules/
+dist/
+coverage/
+
+# IDE
+.idea/
+
+# конфиги
+.env
