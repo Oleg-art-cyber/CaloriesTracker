@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.1.5] – 2025-05-12
+### Fixed
+- Cast `created_by` and `req.user.id` to `Number` in ownership middleware  
+- Allow **admin** to bypass ownership check  
+- Enforce ownership check **after** auth in `PUT` & `DELETE` product routes  
+
 ## [v0.4.0.1] – 2025-05-12 - Category refactor
 
 ### Added
