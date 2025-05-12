@@ -1,68 +1,69 @@
 // server/src/routes/products.js
-// Product routes + basic validation + role-based auth
+// Product routes + validation + role/ownership guards
 
-const express  = require('express');
-const Joi      = require('joi');
-const prodCtrl = require('../controllers/products');
-const auth     = require('../middlewares/auth');           // JWT/role guard
+const express   = require('express');
+const Joi       = require('joi');
+const prodCtrl  = require('../controllers/products');
+const auth      = require('../middlewares/auth');
+const ownership = require('../middlewares/ownership');
 
 const router = express.Router();
 
+// load and build productSchema (как ты делал)
 const db = require('../config/dbSingleton').getConnection();
-let allowedCatIds = [];
-let idOther = null;
-
+let allowedCatIds = [], idOther = null;
 db.query('SELECT id, name FROM category', (e, rows) => {
-    if (e) { console.error('Can’t load categories', e); return; }
+    if (e) return console.error(e);
     allowedCatIds = rows.map(r => r.id);
-    idOther = rows.find(r => r.name === 'other').id;
+    idOther       = rows.find(r => r.name === 'other')?.id;
 });
-
-/* ----- validation schemas ----- */
 const productSchema = Joi.object({
-    name:     Joi.string().min(2).required(),
-    calories: Joi.number().positive().required(),
-    fat:      Joi.number().min(0).required(),
-    protein:  Joi.number().min(0).required(),
-    carbs:    Joi.number().min(0).required(),
+    name:        Joi.string().min(2).required(),
+    calories:    Joi.number().positive().required(),
+    fat:         Joi.number().min(0).required(),
+    protein:     Joi.number().min(0).required(),
+    carbs:       Joi.number().min(0).required(),
     category_id: Joi.number().valid(...allowedCatIds).default(() => idOther)
 });
-
-/* helper to wrap Joi validation */
 const validate = schema => (req, res, next) => {
     const { error } = schema.validate(req.body);
     if (error) return res.status(400).json({ error: error.message });
     next();
 };
 
-/* ---------- ROUTES ---------- */
+/* GET all products (public or owned) */
+router.get(
+    '/',
+    auth(['user','admin']),
+    prodCtrl.getAll
+);
 
-// GET /api/products                  – all products (public)
-router.get('/', prodCtrl.getAll);
 
-// GET /api/products/:id              – single product (public)
+/* GET one product (public or owned) */
 router.get('/:id', prodCtrl.getOne);
 
-// POST /api/products                 – create (admin only)
+/* POST create product — both user and admin */
 router.post(
     '/',
-    auth(['admin']),                   // <- role check
-    validate(productSchema),           // <- body validation
+    auth(['user','admin']),
+    validate(productSchema),
     prodCtrl.create
 );
 
-// PUT /api/products/:id              – update (admin only)
+/* PUT update — only admin or owner */
 router.put(
     '/:id',
-    auth(['admin']),
+    auth(['user','admin']),
+    ownership,
     validate(productSchema),
     prodCtrl.update
 );
 
-// DELETE /api/products/:id           – delete (admin only)
+/* DELETE remove — only admin or owner */
 router.delete(
     '/:id',
-    auth(['admin']),
+    auth(['user','admin']),
+    ownership,
     prodCtrl.remove
 );
 
