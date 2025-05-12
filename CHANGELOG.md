@@ -13,6 +13,9 @@
 * all CRUD SQL & Joi schemas updated
 * Products list shows human-readable `category` label
 
+### SQL
+- Now information about category save in other table and coonect to products as FK
+
 ## [0.2.0] – 2025-05-**  
 ### Added  
 - User registration & login  
