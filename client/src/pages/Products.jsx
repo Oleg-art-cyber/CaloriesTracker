@@ -1,3 +1,4 @@
+// client/src/pages/Products.jsx
 import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
@@ -5,18 +6,23 @@ import ProductForm from '../components/ProductForm';
 
 export default function Products() {
     const { token } = useContext(AuthContext);
-    const isAdmin =
-        token && JSON.parse(atob(token.split('.')[1])).role === 'admin';
 
-    const [list, setList]     = useState([]);
-    const [error, setError]   = useState(null);
-    const [adding, setAdding] = useState(false);
+    // decode JWT once
+    const payload = token ? JSON.parse(atob(token.split('.')[1])) : {};
+    const isAdmin = payload.role === 'admin';
+    const userId  = payload.id;
+
+    const [list,    setList]    = useState([]);
+    const [error,   setError]   = useState(null);
+    const [adding, setAdding]   = useState(false);
     const [editing, setEditing] = useState(null);
 
-    /* fetch all products */
+    // fetch all products (server already filters by public/owned)
     const fetchProducts = async () => {
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/products`);
+            const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/products`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
             setList(Array.isArray(data) ? data : []);
             setError(null);
         } catch (e) {
@@ -26,13 +32,18 @@ export default function Products() {
         }
     };
 
-    useEffect(() => { fetchProducts(); }, []);
+    useEffect(() => {
+        if (token) fetchProducts();
+    }, [token]);
 
-    /* delete single product */
+    // delete handler
     const handleDelete = async id => {
         if (!confirm('Delete product?')) return;
         try {
-            await axios.delete(`${import.meta.env.VITE_API_URL}/products/${id}`);
+            await axios.delete(
+                `${import.meta.env.VITE_API_URL}/products/${id}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
             fetchProducts();
         } catch (e) {
             console.error(e);
@@ -45,7 +56,8 @@ export default function Products() {
             <header className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Products</h2>
 
-                {isAdmin && (
+                {/* Add button for any logged-in user */}
+                {token && (
                     <button
                         onClick={() => setAdding(true)}
                         className="bg-green-600 text-white px-4 py-2 rounded"
@@ -66,23 +78,26 @@ export default function Products() {
                         <div>
                             <p className="font-medium">{p.name}</p>
                             <p className="text-sm text-gray-500">
-                                {p.calories} kcal
+                                {p.calories} kcal  · {p.fat} fat  · {p.protein} protein  · {p.carbs} carbs
                                 {p.category && (
-                                    <> &middot; <span className="italic">{p.category}</span></>
+                                    <> · <span className="italic">{p.category}</span></>
                                 )}
                             </p>
                         </div>
 
-                        {isAdmin && (
+                        {/* Edit/Delete only for admin or owner */}
+                        {(isAdmin || p.created_by === userId) && (
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setEditing(p)}
-                                    className="text-blue-600">
+                                    className="text-blue-600"
+                                >
                                     Edit
                                 </button>
                                 <button
                                     onClick={() => handleDelete(p.id)}
-                                    className="text-red-600">
+                                    className="text-red-600"
+                                >
                                     Delete
                                 </button>
                             </div>
@@ -102,7 +117,7 @@ export default function Products() {
             {/* Edit modal */}
             {editing && (
                 <ProductForm
-                    product={editing}          // editing product has category_id
+                    product={editing}
                     onSuccess={fetchProducts}
                     onClose={() => setEditing(null)}
                 />
