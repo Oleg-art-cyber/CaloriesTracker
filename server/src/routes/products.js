@@ -8,6 +8,16 @@ const auth     = require('../middlewares/auth');           // JWT/role guard
 
 const router = express.Router();
 
+const db = require('../config/dbSingleton').getConnection();
+let allowedCatIds = [];
+let idOther = null;
+
+db.query('SELECT id, name FROM category', (e, rows) => {
+    if (e) { console.error('Can’t load categories', e); return; }
+    allowedCatIds = rows.map(r => r.id);
+    idOther = rows.find(r => r.name === 'other').id;
+});
+
 /* ----- validation schemas ----- */
 const productSchema = Joi.object({
     name:     Joi.string().min(2).required(),
@@ -15,7 +25,7 @@ const productSchema = Joi.object({
     fat:      Joi.number().min(0).required(),
     protein:  Joi.number().min(0).required(),
     carbs:    Joi.number().min(0).required(),
-    category: Joi.string().allow(null, '')
+    category_id: Joi.number().valid(...allowedCatIds).default(() => idOther)
 });
 
 /* helper to wrap Joi validation */

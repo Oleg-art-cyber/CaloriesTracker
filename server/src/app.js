@@ -2,10 +2,12 @@ const express = require('express');
 const cors    = require('cors');
 const productsRouter = require('./routes/products');
 const authRouter = require('./routes/auth');
+const catRoutes = require('./routes/categories');
 
 const app  = express();
 const PORT = 3001;
 
+app.use('/api/categories', catRoutes);
 app.use(cors());
 app.use(express.json());
 
