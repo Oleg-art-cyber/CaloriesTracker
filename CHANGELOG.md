@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.4.0.1 – Category refactor
+## [v0.4.0.1] – 2025-05-12 - Category refactor
 
 ### Added
 * reference table **category** with 27 predefined records
