@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import Login     from './pages/Login';
+import Register  from './pages/Register';
 import Products  from './pages/Products';
 import Navbar from './components/Navbar';
 import { useContext } from 'react';
@@ -12,6 +13,7 @@ export default function App() {
                 <Navbar />
                 <Routes>
                     <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
                     <Route path="/" element={<Protected><Products /></Protected>} />
                 </Routes>
             </BrowserRouter>

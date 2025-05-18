@@ -6,10 +6,11 @@ const catRoutes = require('./routes/categories');
 
 const app  = express();
 const PORT = 3001;
-
+app.use(express.json());
+app.use('/api/auth', authRouter)
 app.use('/api/categories', catRoutes);
 app.use(cors());
-app.use(express.json());
+
 
 app.get('/', (_req, res) => res.json({ message: 'Server is working!' }));
 app.use('/api/products', productsRouter);

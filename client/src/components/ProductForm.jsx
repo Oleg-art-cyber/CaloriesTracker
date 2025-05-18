@@ -1,100 +1,114 @@
 // client/src/components/ProductForm.jsx
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useContext } from 'react'
+import axios from 'axios'
+import { AuthContext } from '../context/AuthContext'
 
 export default function ProductForm({ product, onSuccess, onClose }) {
-    /* ----- local state ----- */
-    const [cats, setCats] = useState([]);       // category list [{id,label,name}]
+    const { token } = useContext(AuthContext)
+    const authHeader = token ? { Authorization: `Bearer ${token}` } : {}
+
+    const [cats, setCats] = useState([])
     const [form, setForm] = useState({
-        name: '', calories: '', fat: '', protein: '', carbs: '', category_id: null
-    });
-    const [err, setErr] = useState(null);
+        name: '',
+        calories: '',
+        fat: '',
+        protein: '',
+        carbs: '',
+        category_id: ''
+    })
+    const [err, setErr] = useState(null)
 
-    /* ----- fetch categories once ----- */
+    // Load categories on mount
     useEffect(() => {
-        axios.get(`${import.meta.env.VITE_API_URL}/categories`)
-            .then(r => {
-                setCats(r.data);                               // save list
-                const other = r.data.find(c => c.name === 'other');
-                setForm(f => ({ ...f, category_id: other?.id || r.data[0].id }));
+        axios
+            .get('/api/categories', { headers: authHeader })
+            .then(res => {
+                setCats(res.data)
+                const other = res.data.find(c => c.name === 'other')
+                setForm(f => ({
+                    ...f,
+                    category_id: other?.id ?? res.data[0]?.id
+                }))
             })
-            .catch(console.error);
-    }, []);
+            .catch(e => {
+                console.error(e)
+                setErr('Failed to load categories')
+            })
+    }, [])
 
-    /* ----- pre-fill when editing ----- */
+    // If editing, populate form
     useEffect(() => {
         if (product && cats.length) {
-            const { name, calories, fat, protein, carbs, category_id } = product;
             setForm({
-                name,
-                calories: String(calories),
-                fat: String(fat),
-                protein: String(protein),
-                carbs: String(carbs),
-                category_id: category_id || cats.find(c => c.name === 'other').id
-            });
+                name:        product.name,
+                calories:    String(product.calories),
+                fat:         String(product.fat),
+                protein:     String(product.protein),
+                carbs:       String(product.carbs),
+                category_id: product.category_id
+            })
         }
-    }, [product, cats]);
+    }, [product, cats])
 
-    /* ----- helpers ----- */
-    const handle = e => {
-        const { name, value } = e.target;
-        setForm({ ...form, [name]: name === 'category_id' ? Number(value) : value });
-    };
+    function handleChange(e) {
+        const { name, value } = e.target
+        setForm(prev => ({
+            ...prev,
+            [name]: name === 'category_id' ? Number(value) : value
+        }))
+        setErr(null)
+    }
 
-    const submit = async () => {
+    async function handleSubmit(e) {
+        e.preventDefault()
         const payload = {
-            name: form.name,
-            calories: +form.calories,
-            fat: +form.fat,
-            protein: +form.protein,
-            carbs: +form.carbs,
-            category_id: +form.category_id
-        };
+            name:        form.name,
+            calories:    Number(form.calories),
+            fat:         Number(form.fat),
+            protein:     Number(form.protein),
+            carbs:       Number(form.carbs),
+            category_id: form.category_id
+        }
         try {
             if (product) {
-                await axios.put(
-                    `${import.meta.env.VITE_API_URL}/products/${product.id}`,
-                    payload
-                );
+                await axios.put(`/api/products/${product.id}`, payload, { headers: authHeader })
             } else {
-                await axios.post(
-                    `${import.meta.env.VITE_API_URL}/products`,
-                    payload
-                );
+                await axios.post('/api/products', payload, { headers: authHeader })
             }
-            onSuccess();
-            onClose();
+            onSuccess()
+            onClose()
         } catch (e) {
-            setErr(e.response?.data?.error || 'Server error');
+            console.error(e)
+            setErr(e.response?.data?.error || 'Server error')
         }
-    };
+    }
 
-    /* ----- render ----- */
     return (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded w-full max-w-md space-y-3">
-                <h2 className="text-xl font-semibold">
-                    {product ? 'Edit product' : 'Add product'}
+            <form
+                onSubmit={handleSubmit}
+                className="bg-white p-6 rounded-2xl w-full max-w-md space-y-5"
+            >
+                <h2 className="text-xl font-semibold text-center">
+                    {product ? 'Edit Product' : 'Add Product'}
                 </h2>
 
                 {['name', 'calories', 'fat', 'protein', 'carbs'].map(key => (
                     <input
                         key={key}
                         name={key}
-                        placeholder={key}
+                        placeholder={key.charAt(0).toUpperCase() + key.slice(1)}
                         value={form[key]}
-                        onChange={handle}
-                        className="border p-2 w-full rounded"
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                     />
                 ))}
 
-                {/* ---- category select ---- */}
                 <select
                     name="category_id"
-                    value={form.category_id ?? ''}
-                    onChange={handle}
-                    className="border p-2 w-full rounded"
+                    value={form.category_id}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                 >
                     {cats.map(c => (
                         <option key={c.id} value={c.id}>
@@ -103,17 +117,24 @@ export default function ProductForm({ product, onSuccess, onClose }) {
                     ))}
                 </select>
 
-                {err && <p className="text-red-600">{err}</p>}
+                {err && <p className="text-red-600 text-center">{err}</p>}
 
-                <div className="flex gap-2 justify-end">
-                    <button className="px-4 py-2 rounded bg-gray-200" onClick={onClose}>
+                <div className="flex justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+                    >
                         Cancel
                     </button>
-                    <button className="px-4 py-2 rounded bg-blue-600 text-white" onClick={submit}>
+                    <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    >
                         {product ? 'Update' : 'Save'}
                     </button>
                 </div>
-            </div>
+            </form>
         </div>
-    );
+    )
 }

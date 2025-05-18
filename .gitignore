@@ -9,3 +9,6 @@ coverage/
 # конфиги
 .env
 .idea/
+
+# macOS
+.DS_Store

@@ -1,13 +1,13 @@
 // server/src/routes/auth.js
-const express = require('express');
-const ctrl    = require('../controllers/auth');
+const express           = require('express')
+const { register, login } = require('../controllers/auth')
+const router            = express.Router()
 
-const router = express.Router();
+// POST /api/auth/register
+router.post('/register', register)
 
-// POST /api/auth/register  → ctrl.register
-router.post('/register', ctrl.register);
+// POST /api/auth/login
+router.post('/login', login)
 
-// POST /api/auth/login     → ctrl.login
-router.post('/login',    ctrl.login);
+module.exports = router
 
-module.exports = router;
