@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.9] – 2025-05-18
+### Added
+   * Search field with debounce (client & server)
+   * Pagination (page, limit, total) in API and UI
+   * Category badge and dynamic select
+   Fixed
+   * Consistent Axios auth headers, error handling
+ ----------------------------------
+
 ## [0.4.1.5] – 2025-05-12
 ### Fixed
 - Cast `created_by` and `req.user.id` to `Number` in ownership middleware  
