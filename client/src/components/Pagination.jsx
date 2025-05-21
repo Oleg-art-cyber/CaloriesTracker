@@ -1,7 +1,7 @@
 // client/src/components/Pagination.jsx
 export default function Pagination({ page, total, limit, onPage }) {
     const pages = Math.ceil(total / limit);
-    if (pages <= 1) return null;          // ничего не рисуем, если всего одна страница
+    if (pages <= 1) return null;
 
     return (
         <div className="flex justify-center gap-3 mt-6">

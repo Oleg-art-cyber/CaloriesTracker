@@ -1,8 +1,12 @@
+// client/src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import Login     from './pages/Login';
 import Register  from './pages/Register';
 import Products  from './pages/Products';
+import Exercises from './pages/Exercises';
+import Diary     from './pages/Diary';     // Assuming Diary is the main page now
+import MyRecipes from './pages/MyRecipes'; // <-- NEW
 import Navbar from './components/Navbar';
 import { useContext } from 'react';
 
@@ -11,18 +15,36 @@ export default function App() {
         <AuthProvider>
             <BrowserRouter>
                 <Navbar />
-                <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
-                    <Route path="/" element={<Protected><Products /></Protected>} />
-                </Routes>
+                <main className="container mx-auto mt-4 px-2 sm:px-4">
+                    <Routes>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+
+                        {/* Protected Routes */}
+                        <Route path="/" element={<Protected><Diary /></Protected>} />
+                        <Route path="/diary" element={<Protected><Diary /></Protected>} />
+                        <Route path="/products" element={<Protected><Products /></Protected>} />
+                        <Route path="/exercises" element={<Protected><Exercises /></Protected>} />
+                        <Route path="/my-recipes" element={<Protected><MyRecipes /></Protected>} /> {/* <-- NEW ROUTE */}
+                        {/* Optional: Route for editing a specific recipe if RecipeForm is a page */}
+                        {/* <Route path="/my-recipes/edit/:recipeId" element={<Protected><RecipeEditPage /></Protected>} /> */}
+
+                        {/* Redirect any other path to diary if logged in, or login if not */}
+                        <Route path="*" element={<NavigateToAppropriate />} />
+
+                    </Routes>
+                </main>
             </BrowserRouter>
         </AuthProvider>
     );
 }
 
-/* ---- simple guard ---- */
 function Protected({ children }) {
     const { token } = useContext(AuthContext);
     return token ? children : <Navigate to="/login" replace />;
+}
+
+function NavigateToAppropriate() {
+    const { token } = useContext(AuthContext);
+    return token ? <Navigate to="/diary" replace /> : <Navigate to="/login" replace />;
 }
