@@ -3,7 +3,7 @@
 | # | Feature | Status | Source |
 |---|---------|--------|--------|
 | 1 | **Login with JWT** | ✅ | P1.2 :contentReference[oaicite:0]{index=0}:contentReference[oaicite:1]{index=1} |
-| 2 | Food diary CRUD (meals) | 🚧 (next) | P2 / P2.1 / P2.2 |
+| 2 | Food diary CRUD (meals) |  ✅ | P2 / P2.1 / P2.2 |
 | 3 | Daily calorie calculator | planned | 003-UC |
 | 4 | Activity log & calories burned | planned | Req-4 |
 | 5 | Progress stats & charts | planned | 007-UC |
