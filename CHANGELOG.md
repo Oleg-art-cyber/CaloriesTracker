@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.2] - 2025-05-21
+Backend (server):
+- Added Recipe & RecipeIngredient tables.
+- Modified MealProduct table for recipe linkage and surrogate PK.
+- Created /api/recipes CRUD endpoints.
+- Updated Diary controller (/api/diary) for recipe logging & nutritional calculation.
+- Adapted diary item PATCH/DELETE to use MealProduct.id.
+
+Frontend (client):
+- Added 'My Recipes' page (MyRecipes.jsx) for recipe CRUD.
+- Created 'RecipeForm.jsx' modal with ingredient search & management.
+- Updated 'AddItemModal.jsx' for selecting/adding both products and recipes.
+- Updated 'MealCard.jsx' & 'MealItemRow.jsx' for displaying products/recipes and using MealProduct.id.
+- Added 'My Recipes' navigation link.
+- Resolved 'charAt' error by correcting prop usage in modals.
+- Addressed 'ERR_INSUFFICIENT_RESOURCES' with recommendations (temporary client-side limit applied for testing).
+- Improved Vite proxy configuration.
+
+Database:
+- Applied ALTER TABLE statements to MealProduct.
+- Created Recipe and RecipeIngredient tables.
+
 ## [0.4.9] – 2025-05-18
 ### Added
    * Search field with debounce (client & server)
