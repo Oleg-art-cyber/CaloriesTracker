@@ -1,3 +1,4 @@
+//server/src/middlewares/auth.js
 // JWT / Role authorization middleware
 // Usage: router.post('/route', auth(['admin']), handler);
 

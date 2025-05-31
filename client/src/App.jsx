@@ -8,6 +8,7 @@ import Exercises from './pages/Exercises';
 import Diary     from './pages/Diary';     // Assuming Diary is the main page now
 import MyRecipes from './pages/MyRecipes'; // <-- NEW
 import Navbar from './components/Navbar';
+import ProfilePage from './pages/Profile';
 import { useContext } from 'react';
 
 export default function App() {
@@ -25,11 +26,8 @@ export default function App() {
                         <Route path="/diary" element={<Protected><Diary /></Protected>} />
                         <Route path="/products" element={<Protected><Products /></Protected>} />
                         <Route path="/exercises" element={<Protected><Exercises /></Protected>} />
-                        <Route path="/my-recipes" element={<Protected><MyRecipes /></Protected>} /> {/* <-- NEW ROUTE */}
-                        {/* Optional: Route for editing a specific recipe if RecipeForm is a page */}
-                        {/* <Route path="/my-recipes/edit/:recipeId" element={<Protected><RecipeEditPage /></Protected>} /> */}
-
-                        {/* Redirect any other path to diary if logged in, or login if not */}
+                        <Route path="/my-recipes" element={<Protected><MyRecipes /></Protected>} />
+                        <Route path="/profile" element={<Protected><ProfilePage /></Protected>}/>
                         <Route path="*" element={<NavigateToAppropriate />} />
 
                     </Routes>
