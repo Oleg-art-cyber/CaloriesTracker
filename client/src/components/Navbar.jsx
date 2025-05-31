@@ -35,6 +35,9 @@ export default function Navbar() {
                     <NavLink to="/exercises" className={linkClass}>
                         Exercises
                     </NavLink>
+                    <NavLink to="/profile" className={linkClass}>
+                        Profile
+                    </NavLink>
                     <button
                         onClick={handleLogout}
                         className="bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-md text-sm"

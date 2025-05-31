@@ -4,18 +4,20 @@ const cors    = require('cors');
 
 // Routers
 const authRouter = require('./routes/auth');
-const categoryRoutes = require('./routes/categories'); // Renamed from catRoutes for clarity
+const categoryRoutes = require('./routes/categories');
 const productRoutes = require('./routes/products');
 const diaryRoutes = require('./routes/diary');
-const exerciseRoutes = require('./routes/exercise'); // Ensure this path is correct; might be './routes/exercises'
-const recipeRoutes = require('./routes/recipes');   // New router for recipes
+const exerciseRoutes = require('./routes/exercise'); // or './routes/exercises'
+const recipeRoutes = require('./routes/recipes');
+const physicalActivityRoutes = require('./routes/physicalActivity');
+const profileRoutes = require('./routes/profile');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
-// Core Middlewares
-app.use(cors()); // Apply CORS to all incoming requests
-app.use(express.json()); // Parse JSON request bodies
+// Middlewares
+app.use(cors());
+app.use(express.json());
 
 // API Routes
 app.use('/api/auth', authRouter);
@@ -23,15 +25,17 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/diary', diaryRoutes);
 app.use('/api/exercises', exerciseRoutes);
-app.use('/api/recipes', recipeRoutes); // Mount recipe routes
+app.use('/api/recipes', recipeRoutes);
+app.use('/api/physical-activity', physicalActivityRoutes);
+app.use('/api/profile', profileRoutes);
 
-// Root/Health Check Route
+// Root route
 app.get('/', (_req, res) => res.json({ message: 'Server is operational.' }));
 
-// Optional: Basic global error handler
+// Basic error handling
 app.use((err, req, res, next) => {
     console.error("Unhandled application error:", err.stack);
-    res.status(500).json({ error: 'Internal Server Error. Please try again later.' });
+    res.status(500).json({ error: 'Internal Server Error.' });
 });
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
