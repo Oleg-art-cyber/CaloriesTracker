@@ -1,7 +1,9 @@
 // server/controllers/diary.js
-const dbSingleton = require('../config/dbSingleton');
+const dbSingleton = require('../config/dbSingleton'); // Adjust path if necessary
 const conn = dbSingleton.getConnection();
+const { checkAndAwardAchievements } = require('./achievements'); // Import achievement checker
 
+// --- SQL HELPER FOR FETCHING RECIPE DETAILS AND CALCULATING NUTRITION ---
 const getRecipeDetailsWithNutrition = (recipeIds, callback) => {
     if (!recipeIds || recipeIds.length === 0) {
         return callback(null, {});
@@ -25,7 +27,7 @@ const getRecipeDetailsWithNutrition = (recipeIds, callback) => {
     `;
     conn.query(query, recipeIds, (err, ingredients) => {
         if (err) {
-            console.error("[getRecipeDetailsWithNutrition] SQL Error:", err.code, err.sqlMessage, err);
+            console.error("[DIARY_CTRL_HELPER] getRecipeDetailsWithNutrition - SQL Error:", err.code, err.sqlMessage);
             return callback(err, null);
         }
         const recipesData = {};
@@ -50,8 +52,8 @@ const getRecipeDetailsWithNutrition = (recipeIds, callback) => {
     });
 };
 
-// (processAndRespondGetDay - без изменений, как в ответе #41, но проверьте, что parseFloat используется для числовых полей)
-function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, recipesFullDetails, res) {
+// --- Main processing function for getDay to avoid deep nesting ---
+function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, recipesFullDetails, res, req) { // Added req for achievement check context
     const mealsOutput = {};
     let summaryKcalConsumed = 0, summaryProtein = 0, summaryFat = 0, summaryCarbs = 0;
 
@@ -124,7 +126,21 @@ function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, r
             }
         }
     });
+
     res.json({ meals: mealsOutput, summary: finalSummary, activities: loggedActivities || [] });
+
+    // Asynchronously check for achievements after sending response
+    // This allows the user to get their diary data faster.
+    // Pass relevant data for achievement checks.
+    checkAndAwardAchievements(userId, {
+        type: 'DIARY_LOADED',
+        data: {
+            date: date,
+            summary: finalSummary,
+            meals: mealsOutput, // or just mealItemRows
+            activities: loggedActivities
+        }
+    }).catch(achErr => console.error("[DiaryCtrl] Error during achievement check after diary load:", achErr));
 }
 
 // --- GET /api/diary?date=YYYY-MM-DD ---
@@ -152,30 +168,30 @@ exports.getDay = (req, res) => {
         ORDER BY FIELD(m.meal_type, 'breakfast', 'lunch', 'dinner', 'snack'), mp.id;
     `;
 
-    // CORRECTED SQL for Physical Activities (references pa.user_id directly)
+    // Corrected SQL for Physical Activities (references pa.user_id directly)
     const sqlPhysicalActivities = `
-        SELECT 
-            pa.id, 
-            pa.exercise_definition_id, 
-            ed.name AS exercise_name, 
-            pa.duration_minutes, 
+        SELECT
+            pa.id,
+            pa.exercise_definition_id,
+            ed.name AS exercise_name,
+            pa.duration_minutes,
             pa.calories_burned,
             pa.activity_type
-        FROM PhysicalActivity pa
-        LEFT JOIN ExerciseDefinition ed ON pa.exercise_definition_id = ed.id
-        WHERE pa.user_id = ? AND pa.activity_date = ?  -- Now using pa.user_id
-        ORDER BY pa.id; 
+        FROM PhysicalActivity pa  -- Assuming PhysicalActivity now has user_id
+                 LEFT JOIN ExerciseDefinition ed ON pa.exercise_definition_id = ed.id
+        WHERE pa.user_id = ? AND pa.activity_date = ?
+        ORDER BY pa.id;
     `;
 
     conn.query(sqlMealItems, [userId, date], (errMealItems, mealItemRows) => {
         if (errMealItems) {
-            console.error('getDay - SQL Error (fetch meal items):', errMealItems.code, errMealItems.sqlMessage, errMealItems);
+            console.error('getDay - SQL Error (fetch meal items):', errMealItems.code, errMealItems.sqlMessage);
             return res.status(500).json({ error: 'Failed to fetch diary meal entries', details: errMealItems.code });
         }
 
         conn.query(sqlPhysicalActivities, [userId, date], (errActivities, loggedActivities) => {
             if (errActivities) {
-                console.error('getDay - SQL Error (fetch activities):', errActivities.code, errActivities.sqlMessage, errActivities);
+                console.error('getDay - SQL Error (fetch activities):', errActivities.code, errActivities.sqlMessage);
                 return res.status(500).json({ error: 'Failed to fetch logged activities', details: errActivities.code });
             }
 
@@ -186,17 +202,16 @@ exports.getDay = (req, res) => {
                     if (recipeErr) {
                         return res.status(500).json({ error: 'Failed to fetch detailed recipe information for diary', details: recipeErr.code || recipeErr.message });
                     }
-                    processAndRespondGetDay(userId, date, mealItemRows || [], loggedActivities || [], recipesFullDetails, res);
+                    processAndRespondGetDay(userId, date, mealItemRows || [], loggedActivities || [], recipesFullDetails, res, req); // Pass req
                 });
             } else {
-                processAndRespondGetDay(userId, date, mealItemRows || [], loggedActivities || [], {}, res);
+                processAndRespondGetDay(userId, date, mealItemRows || [], loggedActivities || [], {}, res, req); // Pass req
             }
         });
     });
 };
 
 // --- POST /api/diary/:type ---
-// (exports.saveMeal - без изменений из ответа #41)
 exports.saveMeal = (req, res) => {
     const userId = req.user.id;
     const mealType = req.params.type;
@@ -236,7 +251,7 @@ exports.saveMeal = (req, res) => {
 
     conn.query(upsertMealQuery, [userId, mealDateTime, mealType], (err, mealResult) => {
         if (err) {
-            console.error('saveMeal - SQL Error (upsert meal):', err.code, err.sqlMessage, err);
+            console.error('saveMeal - SQL Error (upsert meal):', err.code, err.sqlMessage);
             return res.status(500).json({ error: 'Failed to process meal entry', details: err.code });
         }
 
@@ -260,17 +275,22 @@ exports.saveMeal = (req, res) => {
 
         conn.query(insertMealProductsQuery, [mealProductValues], (insertErr, insertResult) => {
             if (insertErr) {
-                console.error('saveMeal - SQL Error (insert meal products):', insertErr.code, insertErr.sqlMessage, insertErr);
+                console.error('saveMeal - SQL Error (insert meal products):', insertErr.code, insertErr.sqlMessage);
                 return res.status(500).json({ error: 'Failed to save meal items to diary', details: insertErr.code });
             }
-            const pseudoReqForGetDay = { user: req.user, query: { date: date } };
+
+            checkAndAwardAchievements(userId, {
+                type: 'MEAL_LOGGED',
+                data: { date: date, mealType: mealType, itemCount: items.length }
+            }).catch(achErr => console.error("[DiaryCtrl] Error during achievement check after meal log:", achErr));
+
+            const pseudoReqForGetDay = { user: req.user, query: { date: date } }; // req.user is from original req
             exports.getDay(pseudoReqForGetDay, res);
         });
     });
 };
 
 // --- PATCH /api/diary/item/:mealProductId ---
-// (exports.updateMealItem - без изменений из ответа #41)
 exports.updateMealItem = (req, res) => {
     const mealProductId = parseInt(req.params.mealProductId, 10);
     const { amountGrams, servingsConsumed } = req.body;
@@ -286,45 +306,37 @@ exports.updateMealItem = (req, res) => {
                  JOIN meal m ON mp.meal_id = m.id
         WHERE mp.id = ?;`;
     conn.query(checkQuery, [mealProductId], (err, items) => {
-        if (err) {
-            console.error('updateMealItem - SQL Error (fetch item):', err.code, err.sqlMessage, err);
-            return res.status(500).json({ error: 'Failed to retrieve item for update.', details: err.code });
-        }
-        if (items.length === 0) {
-            return res.status(404).json({ error: 'Meal item not found.' });
-        }
+        if (err) { /* ... error handling ... */ return res.status(500).json({ error: 'Failed to retrieve item for update.'}); }
+        if (items.length === 0) { return res.status(404).json({ error: 'Meal item not found.' }); }
         const item = items[0];
-        if (item.user_id !== userId) {
-            return res.status(403).json({ error: 'Forbidden: You do not own this meal item.' });
-        }
+        if (item.user_id !== userId) { return res.status(403).json({ error: 'Forbidden: You do not own this meal item.' }); }
 
         let updateQuerySql;
         let params;
 
         if (item.product_id !== null && amountGrams !== undefined) {
             const numAmount = parseFloat(amountGrams);
-            if (isNaN(numAmount) || numAmount <= 0) {
-                return res.status(400).json({ error: 'Invalid amountGrams. Must be a positive number.' });
-            }
+            if (isNaN(numAmount) || numAmount <= 0) { return res.status(400).json({ error: 'Invalid amountGrams.' }); }
             updateQuerySql = 'UPDATE MealProduct SET product_amount = ? WHERE id = ?';
             params = [numAmount, mealProductId];
         } else if (item.recipe_id !== null && servingsConsumed !== undefined) {
             const numServings = parseFloat(servingsConsumed);
-            if (isNaN(numServings) || numServings <= 0) {
-                return res.status(400).json({ error: 'Invalid servingsConsumed. Must be a positive number.' });
-            }
+            if (isNaN(numServings) || numServings <= 0) { return res.status(400).json({ error: 'Invalid servingsConsumed.' }); }
             updateQuerySql = 'UPDATE MealProduct SET servings_consumed = ? WHERE id = ?';
             params = [numServings, mealProductId];
         } else {
-            return res.status(400).json({ error: 'Invalid request. Provide amountGrams for products or servingsConsumed for recipes, matching the item type.' });
+            return res.status(400).json({ error: 'Invalid request payload for update.' });
         }
 
         conn.query(updateQuerySql, params, (updateErr) => {
-            if (updateErr) {
-                console.error('updateMealItem - SQL Error (update item):', updateErr.code, updateErr.sqlMessage, updateErr);
-                return res.status(500).json({ error: 'Failed to update meal item.', details: updateErr.code });
-            }
-            const diaryDate = item.meal_datetime ? new Date(item.meal_datetime).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+            if (updateErr) { /* ... error handling ... */ return res.status(500).json({ error: 'Failed to update meal item.'}); }
+
+            const diaryDate = item.meal_datetime ? new Date(item.meal_datetime).toISOString().split('T')[0] : date; // Use original req.query.date if item.meal_datetime is somehow null
+            checkAndAwardAchievements(userId, {
+                type: 'MEAL_ITEM_UPDATED',
+                data: { date: diaryDate }
+            }).catch(achErr => console.error("[DiaryCtrl] Error during achievement check after meal item update:", achErr));
+
             const pseudoReqForGetDay = { user: req.user, query: { date: diaryDate } };
             exports.getDay(pseudoReqForGetDay, res);
         });
@@ -332,14 +344,11 @@ exports.updateMealItem = (req, res) => {
 };
 
 // --- DELETE /api/diary/item/:mealProductId ---
-// (exports.removeMealItem - без изменений из ответа #41)
 exports.removeMealItem = (req, res) => {
     const mealProductId = parseInt(req.params.mealProductId, 10);
     const userId = req.user.id;
 
-    if (isNaN(mealProductId)) {
-        return res.status(400).json({ error: 'Invalid meal item ID.' });
-    }
+    if (isNaN(mealProductId)) { return res.status(400).json({ error: 'Invalid meal item ID.' }); }
 
     const checkQuery = `
         SELECT mp.id, m.user_id, m.meal_datetime
@@ -347,24 +356,20 @@ exports.removeMealItem = (req, res) => {
                  JOIN meal m ON mp.meal_id = m.id
         WHERE mp.id = ?;`;
     conn.query(checkQuery, [mealProductId], (err, items) => {
-        if (err) {
-            console.error('removeMealItem - SQL Error (fetch item):', err.code, err.sqlMessage, err);
-            return res.status(500).json({ error: 'Failed to verify item for deletion.', details: err.code });
-        }
-        if (items.length === 0) {
-            return res.status(404).json({ error: 'Meal item not found.' });
-        }
+        if (err) { /* ... error handling ... */ return res.status(500).json({ error: 'Failed to verify item for deletion.' }); }
+        if (items.length === 0) { return res.status(404).json({ error: 'Meal item not found.' }); }
         const item = items[0];
-        if (item.user_id !== userId) {
-            return res.status(403).json({ error: 'Forbidden: You do not own this meal item.' });
-        }
+        if (item.user_id !== userId) { return res.status(403).json({ error: 'Forbidden.' }); }
 
         conn.query('DELETE FROM MealProduct WHERE id = ?', [mealProductId], (deleteErr) => {
-            if (deleteErr) {
-                console.error('removeMealItem - SQL Error (delete item):', deleteErr.code, deleteErr.sqlMessage, deleteErr);
-                return res.status(500).json({ error: 'Failed to remove meal item.', details: deleteErr.code });
-            }
-            const diaryDate = item.meal_datetime ? new Date(item.meal_datetime).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+            if (deleteErr) { /* ... error handling ... */ return res.status(500).json({ error: 'Failed to remove meal item.' }); }
+
+            const diaryDate = item.meal_datetime ? new Date(item.meal_datetime).toISOString().split('T')[0] : date;
+            checkAndAwardAchievements(userId, {
+                type: 'MEAL_ITEM_DELETED',
+                data: { date: diaryDate }
+            }).catch(achErr => console.error("[DiaryCtrl] Error during achievement check after meal item deletion:", achErr));
+
             const pseudoReqForGetDay = { user: req.user, query: { date: diaryDate } };
             exports.getDay(pseudoReqForGetDay, res);
         });

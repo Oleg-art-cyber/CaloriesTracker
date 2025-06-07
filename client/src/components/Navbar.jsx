@@ -35,6 +35,9 @@ export default function Navbar() {
                     <NavLink to="/exercises" className={linkClass}>
                         Exercises
                     </NavLink>
+                    <NavLink to="/achievements" className={linkClass}>
+                        Achievements
+                    </NavLink>
                     <NavLink to="/profile" className={linkClass}>
                         Profile
                     </NavLink>
