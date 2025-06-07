@@ -6,7 +6,7 @@
 | 2 | Food diary CRUD (meals) |  ✅ | P2 / P2.1 / P2.2 |
 | 3 | Daily calorie calculator |  ✅  | 003-UC |
 | 4 | Activity log & calories burned |  ✅  | Req-4 |
-| 5 | Progress stats & charts |  ✅  | 007-UC |
+| 5 | Progress stats & charts |  planned  | 007-UC |
 | 6 | Product catalog CRUD | ✅ | Req-6 / Req-7 |
 | 7 | Admin user management | planned | P5.1 |
 | 8 | Personalised recommendations |  ✅  | P6 |
