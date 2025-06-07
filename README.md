@@ -1,4 +1,4 @@
-## Core features (v0.4.0.1)
+## Core features (v0.6)
 
 | # | Feature | Status | Source |
 |---|---------|--------|--------|
