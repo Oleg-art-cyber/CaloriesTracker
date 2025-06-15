@@ -1,5 +1,5 @@
 // server/controllers/diary.js
-const dbSingleton = require('../config/dbSingleton'); // Adjust path if necessary
+const dbSingleton = require('../config/dbSingleton');
 const conn = dbSingleton.getConnection();
 const { checkAndAwardAchievements } = require('./achievements'); // Import achievement checker
 
@@ -10,7 +10,7 @@ const getRecipeDetailsWithNutrition = (recipeIds, callback) => {
     }
     const placeholders = recipeIds.map(() => '?').join(',');
     const query = `
-        SELECT 
+        SELECT
             ri.recipe_id,
             ri.amount_grams,
             p.name AS product_name,
@@ -21,13 +21,13 @@ const getRecipeDetailsWithNutrition = (recipeIds, callback) => {
             r.total_servings AS recipe_total_servings,
             r.name AS recipe_name
         FROM RecipeIngredient ri
-        JOIN product p ON ri.product_id = p.id
-        JOIN Recipe r ON ri.recipe_id = r.id 
+                 JOIN product p ON ri.product_id = p.id
+                 JOIN Recipe r ON ri.recipe_id = r.id
         WHERE ri.recipe_id IN (${placeholders});
     `;
     conn.query(query, recipeIds, (err, ingredients) => {
         if (err) {
-            console.error("[DIARY_CTRL_HELPER] getRecipeDetailsWithNutrition - SQL Error:", err.code, err.sqlMessage);
+            console.error("[DIARY_CTRL_HELPER] getRecipeDetailsWithNutrition - SQL Error:", err.code, err.sqlMessage, err);
             return callback(err, null);
         }
         const recipesData = {};
@@ -53,7 +53,7 @@ const getRecipeDetailsWithNutrition = (recipeIds, callback) => {
 };
 
 // --- Main processing function for getDay to avoid deep nesting ---
-function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, recipesFullDetails, res, req) { // Added req for achievement check context
+function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, recipesFullDetails, res, req) {
     const mealsOutput = {};
     let summaryKcalConsumed = 0, summaryProtein = 0, summaryFat = 0, summaryCarbs = 0;
 
@@ -130,16 +130,9 @@ function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, r
     res.json({ meals: mealsOutput, summary: finalSummary, activities: loggedActivities || [] });
 
     // Asynchronously check for achievements after sending response
-    // This allows the user to get their diary data faster.
-    // Pass relevant data for achievement checks.
     checkAndAwardAchievements(userId, {
         type: 'DIARY_LOADED',
-        data: {
-            date: date,
-            summary: finalSummary,
-            meals: mealsOutput, // or just mealItemRows
-            activities: loggedActivities
-        }
+        data: { date: date, summary: finalSummary, meals: mealsOutput, activities: loggedActivities }
     }).catch(achErr => console.error("[DiaryCtrl] Error during achievement check after diary load:", achErr));
 }
 
@@ -153,31 +146,26 @@ exports.getDay = (req, res) => {
     }
 
     const sqlMealItems = `
-        SELECT 
+        SELECT
             m.id AS meal_id, m.meal_type, m.meal_datetime,
             mp.id AS meal_product_id, mp.product_id, mp.product_amount,
             mp.recipe_id, mp.servings_consumed,
             p.name AS product_name, p.calories AS product_calories_per_100g,
             p.protein AS product_protein_per_100g, p.fat AS product_fat_per_100g, p.carbs AS product_carbs_per_100g,
-            r.name AS recipe_name 
+            r.name AS recipe_name
         FROM meal m
-        LEFT JOIN MealProduct mp ON mp.meal_id = m.id
-        LEFT JOIN product p ON p.id = mp.product_id AND mp.recipe_id IS NULL
-        LEFT JOIN Recipe r ON r.id = mp.recipe_id AND mp.product_id IS NULL
-        WHERE m.user_id = ? AND DATE(m.meal_datetime) = ? 
+                 LEFT JOIN MealProduct mp ON mp.meal_id = m.id
+                 LEFT JOIN product p ON p.id = mp.product_id AND mp.recipe_id IS NULL
+                 LEFT JOIN Recipe r ON r.id = mp.recipe_id AND mp.product_id IS NULL
+        WHERE m.user_id = ? AND DATE(m.meal_datetime) = ?
         ORDER BY FIELD(m.meal_type, 'breakfast', 'lunch', 'dinner', 'snack'), mp.id;
     `;
 
-    // Corrected SQL for Physical Activities (references pa.user_id directly)
     const sqlPhysicalActivities = `
         SELECT
-            pa.id,
-            pa.exercise_definition_id,
-            ed.name AS exercise_name,
-            pa.duration_minutes,
-            pa.calories_burned,
-            pa.activity_type
-        FROM PhysicalActivity pa  -- Assuming PhysicalActivity now has user_id
+            pa.id, pa.exercise_definition_id, ed.name AS exercise_name,
+            pa.duration_minutes, pa.calories_burned, pa.activity_type
+        FROM PhysicalActivity pa
                  LEFT JOIN ExerciseDefinition ed ON pa.exercise_definition_id = ed.id
         WHERE pa.user_id = ? AND pa.activity_date = ?
         ORDER BY pa.id;
@@ -185,13 +173,13 @@ exports.getDay = (req, res) => {
 
     conn.query(sqlMealItems, [userId, date], (errMealItems, mealItemRows) => {
         if (errMealItems) {
-            console.error('getDay - SQL Error (fetch meal items):', errMealItems.code, errMealItems.sqlMessage);
+            console.error('getDay - SQL Error (fetch meal items):', errMealItems.code, errMealItems.sqlMessage, errMealItems); // Keep detailed log
             return res.status(500).json({ error: 'Failed to fetch diary meal entries', details: errMealItems.code });
         }
 
         conn.query(sqlPhysicalActivities, [userId, date], (errActivities, loggedActivities) => {
             if (errActivities) {
-                console.error('getDay - SQL Error (fetch activities):', errActivities.code, errActivities.sqlMessage);
+                console.error('getDay - SQL Error (fetch activities):', errActivities.code, errActivities.sqlMessage, errActivities); // Keep detailed log
                 return res.status(500).json({ error: 'Failed to fetch logged activities', details: errActivities.code });
             }
 
@@ -199,13 +187,13 @@ exports.getDay = (req, res) => {
 
             if (recipeIdsInDiary.length > 0) {
                 getRecipeDetailsWithNutrition(recipeIdsInDiary, (recipeErr, recipesFullDetails) => {
-                    if (recipeErr) {
+                    if (recipeErr) { // Error already logged in helper
                         return res.status(500).json({ error: 'Failed to fetch detailed recipe information for diary', details: recipeErr.code || recipeErr.message });
                     }
-                    processAndRespondGetDay(userId, date, mealItemRows || [], loggedActivities || [], recipesFullDetails, res, req); // Pass req
+                    processAndRespondGetDay(userId, date, mealItemRows || [], loggedActivities || [], recipesFullDetails, res, req);
                 });
             } else {
-                processAndRespondGetDay(userId, date, mealItemRows || [], loggedActivities || [], {}, res, req); // Pass req
+                processAndRespondGetDay(userId, date, mealItemRows || [], loggedActivities || [], {}, res, req);
             }
         });
     });
@@ -247,11 +235,11 @@ exports.saveMeal = (req, res) => {
     const upsertMealQuery = `
         INSERT INTO meal (user_id, meal_datetime, meal_type)
         VALUES (?, ?, ?)
-        ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id);`;
+            ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id);`;
 
     conn.query(upsertMealQuery, [userId, mealDateTime, mealType], (err, mealResult) => {
         if (err) {
-            console.error('saveMeal - SQL Error (upsert meal):', err.code, err.sqlMessage);
+            console.error('saveMeal - SQL Error (upsert meal):', err.code, err.sqlMessage, err); // Keep detailed log
             return res.status(500).json({ error: 'Failed to process meal entry', details: err.code });
         }
 
@@ -275,7 +263,7 @@ exports.saveMeal = (req, res) => {
 
         conn.query(insertMealProductsQuery, [mealProductValues], (insertErr, insertResult) => {
             if (insertErr) {
-                console.error('saveMeal - SQL Error (insert meal products):', insertErr.code, insertErr.sqlMessage);
+                console.error('saveMeal - SQL Error (insert meal products):', insertErr.code, insertErr.sqlMessage, insertErr); // Keep detailed log
                 return res.status(500).json({ error: 'Failed to save meal items to diary', details: insertErr.code });
             }
 
@@ -284,7 +272,7 @@ exports.saveMeal = (req, res) => {
                 data: { date: date, mealType: mealType, itemCount: items.length }
             }).catch(achErr => console.error("[DiaryCtrl] Error during achievement check after meal log:", achErr));
 
-            const pseudoReqForGetDay = { user: req.user, query: { date: date } }; // req.user is from original req
+            const pseudoReqForGetDay = { user: req.user, query: { date: date } };
             exports.getDay(pseudoReqForGetDay, res);
         });
     });
@@ -306,7 +294,10 @@ exports.updateMealItem = (req, res) => {
                  JOIN meal m ON mp.meal_id = m.id
         WHERE mp.id = ?;`;
     conn.query(checkQuery, [mealProductId], (err, items) => {
-        if (err) { /* ... error handling ... */ return res.status(500).json({ error: 'Failed to retrieve item for update.'}); }
+        if (err) {
+            console.error('updateMealItem - SQL Error (fetch item):', err.code, err.sqlMessage, err); // Keep detailed log
+            return res.status(500).json({ error: 'Failed to retrieve item for update.', details: err.code });
+        }
         if (items.length === 0) { return res.status(404).json({ error: 'Meal item not found.' }); }
         const item = items[0];
         if (item.user_id !== userId) { return res.status(403).json({ error: 'Forbidden: You do not own this meal item.' }); }
@@ -329,9 +320,12 @@ exports.updateMealItem = (req, res) => {
         }
 
         conn.query(updateQuerySql, params, (updateErr) => {
-            if (updateErr) { /* ... error handling ... */ return res.status(500).json({ error: 'Failed to update meal item.'}); }
+            if (updateErr) {
+                console.error('updateMealItem - SQL Error (update item):', updateErr.code, updateErr.sqlMessage, updateErr); // Keep detailed log
+                return res.status(500).json({ error: 'Failed to update meal item.', details: updateErr.code });
+            }
 
-            const diaryDate = item.meal_datetime ? new Date(item.meal_datetime).toISOString().split('T')[0] : date; // Use original req.query.date if item.meal_datetime is somehow null
+            const diaryDate = item.meal_datetime ? new Date(item.meal_datetime).toISOString().split('T')[0] : date;
             checkAndAwardAchievements(userId, {
                 type: 'MEAL_ITEM_UPDATED',
                 data: { date: diaryDate }
@@ -356,13 +350,19 @@ exports.removeMealItem = (req, res) => {
                  JOIN meal m ON mp.meal_id = m.id
         WHERE mp.id = ?;`;
     conn.query(checkQuery, [mealProductId], (err, items) => {
-        if (err) { /* ... error handling ... */ return res.status(500).json({ error: 'Failed to verify item for deletion.' }); }
+        if (err) {
+            console.error('removeMealItem - SQL Error (fetch item):', err.code, err.sqlMessage, err); // Keep detailed log
+            return res.status(500).json({ error: 'Failed to verify item for deletion.', details: err.code });
+        }
         if (items.length === 0) { return res.status(404).json({ error: 'Meal item not found.' }); }
         const item = items[0];
         if (item.user_id !== userId) { return res.status(403).json({ error: 'Forbidden.' }); }
 
         conn.query('DELETE FROM MealProduct WHERE id = ?', [mealProductId], (deleteErr) => {
-            if (deleteErr) { /* ... error handling ... */ return res.status(500).json({ error: 'Failed to remove meal item.' }); }
+            if (deleteErr) {
+                console.error('removeMealItem - SQL Error (delete item):', deleteErr.code, deleteErr.sqlMessage, deleteErr); // Keep detailed log
+                return res.status(500).json({ error: 'Failed to remove meal item.', details: deleteErr.code });
+            }
 
             const diaryDate = item.meal_datetime ? new Date(item.meal_datetime).toISOString().split('T')[0] : date;
             checkAndAwardAchievements(userId, {
@@ -374,4 +374,13 @@ exports.removeMealItem = (req, res) => {
             exports.getDay(pseudoReqForGetDay, res);
         });
     });
+};
+
+// --- MODULE EXPORTS ---
+module.exports = {
+    getDay: exports.getDay,
+    saveMeal: exports.saveMeal,
+    updateMealItem: exports.updateMealItem,
+    removeMealItem: exports.removeMealItem,
+    getRecipeDetailsWithNutrition
 };

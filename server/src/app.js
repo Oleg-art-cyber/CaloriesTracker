@@ -12,6 +12,9 @@ const recipeRoutes = require('./routes/recipes');
 const physicalActivityRoutes = require('./routes/physicalActivity');
 const profileRoutes = require('./routes/profile');
 const achievementRoutes = require('./routes/achievements');
+const statisticsRoutes = require('./routes/statistics');
+const adminStatisticsRoutes = require('./routes/adminStatistics');
+const adminUserRoutes = require('./routes/adminUsers');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -30,6 +33,9 @@ app.use('/api/recipes', recipeRoutes);
 app.use('/api/physical-activity', physicalActivityRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/achievements', achievementRoutes);
+app.use('/api/statistics', statisticsRoutes);
+app.use('/api/admin', adminStatisticsRoutes);
+app.use('/api/admin/users', adminUserRoutes);
 
 // Root route
 app.get('/', (_req, res) => res.json({ message: 'Server is operational.' }));
