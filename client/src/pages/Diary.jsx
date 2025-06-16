@@ -17,6 +17,9 @@ const DEFAULT_MEALS_STATE = {
 const DEFAULT_SUMMARY_STATE = { kcal_consumed: 0, protein: 0, fat: 0, carbs: 0, kcal_burned_exercise: 0, net_kcal: 0 };
 const DEFAULT_PROFILE_STATE = { name: '', weight: 0, height: 0, age: 0, gender: '', activity_level: 'sedentary', goal: 'maintain' };
 
+/**
+ * Diary component for displaying and managing daily meals, activities, and advice
+ */
 export default function Diary() {
     const { token } = useContext(AuthContext);
     const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -44,6 +47,9 @@ export default function Diary() {
     // Function to get auth headers, created once per token change via useMemo if needed, or just inline
     // For simplicity, we'll create it inline where needed or rely on axios defaults if set by AuthContext
 
+    /**
+     * Loads user profile data from the server
+     */
     const loadProfileData = useCallback(async () => {
         if (!token) {
             setUserProfile(DEFAULT_PROFILE_STATE);
@@ -67,6 +73,10 @@ export default function Diary() {
         }
     }, [token]); // Depends only on token
 
+    /**
+     * Loads diary data for the selected date from the server
+     * @param {boolean} preserveScroll - Whether to preserve scroll position
+     */
     const loadDiaryData = useCallback(async (preserveScroll = false) => {
         if (!token) {
             setDiaryData({ meals: DEFAULT_MEALS_STATE, summary: DEFAULT_SUMMARY_STATE, loggedActivities: [] });
@@ -134,6 +144,9 @@ export default function Diary() {
         }
     }, [date, token, loadDiaryData, loadProfileData]); // Dependencies now include the memoized load functions
 
+    /**
+     * Handles data change and reloads diary with scroll preservation
+     */
     const handleDataChangeAndReload = useCallback(() => {
         // console.log("[Diary] handleDataChangeAndReload called to reload diary with scroll preservation.");
         // Scroll position is now saved within loadDiaryData when preserveScroll is true.

@@ -4,6 +4,9 @@ import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import AchievementBadge from '../components/AchievementBadge';
 
+/**
+ * AchievementsPage component for displaying user achievements grouped by category
+ */
 export default function AchievementsPage() {
     const { token } = useContext(AuthContext);
     const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
@@ -15,6 +18,9 @@ export default function AchievementsPage() {
     // Group achievements by category
     const [groupedAchievements, setGroupedAchievements] = useState({});
 
+    /**
+     * Fetches achievements from the server and groups them by category
+     */
     useEffect(() => {
         if (token) {
             setIsLoading(true);

@@ -1,183 +1,303 @@
-// client/src/pages/StatisticsPage.jsx
 import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import LineChartComponent from '../components/LineChartComponent';
 import PieChartComponent from '../components/PieChartComponent';
 
-// Helper function to format date for API (YYYY-MM-DD)
-const formatDateForAPI = (dateObj) => dateObj.toISOString().slice(0, 10);
+/**
+ * Formats JS Date object to YYYY-MM-DD string
+ * @param {Date} dateObj - JavaScript Date object
+ * @returns {string} Formatted date string
+ */
+const formatDateForAPI = (dateObj) => {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 /**
- * Renders the user's statistics page with charts for weight, calories, and macros.
+ * Formats date string for display
+ * @param {string} dateStr - Date string in YYYY-MM-DD format
+ * @returns {string} Formatted date string for display
+ */
+const formatDateForDisplay = (dateStr) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+};
+
+/**
+ * StatisticsPage component for displaying user statistics and nutrition trends
+ * Allows users to select custom date range and view nutrition trends
  */
 export default function StatisticsPage() {
     const { token } = useContext(AuthContext);
 
-    const [periodOption, setPeriodOption] = useState('month');
+    // Initialize dates properly
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day
+    
+    const sixDaysAgo = new Date(today);
+    sixDaysAgo.setDate(today.getDate() - 6);
+    
+    const [startDate, setStartDate] = useState(formatDateForAPI(sixDaysAgo));
+    const [endDate, setEndDate] = useState(formatDateForAPI(today));
+
     const [error, setError] = useState(null);
 
-    // State for each statistics section
     const [weightTrendData, setWeightTrendData] = useState(null);
     const [calorieTrendData, setCalorieTrendData] = useState(null);
     const [periodSummary, setPeriodSummary] = useState(null);
     const [macroDistribution, setMacroDistribution] = useState(null);
 
-    // Individual loading states for better UX
     const [isLoadingWeight, setIsLoadingWeight] = useState(true);
     const [isLoadingTrend, setIsLoadingTrend] = useState(true);
     const [isLoadingSummary, setIsLoadingSummary] = useState(true);
     const [isLoadingMacros, setIsLoadingMacros] = useState(true);
 
-    // Effect for fetching Weight and Calorie Trends (they use the same `period_days` parameter)
+    /**
+     * Validates and updates date range
+     * @param {string} type - 'start' or 'end'
+     * @param {string} value - New date value
+     */
+    const handleDateChange = (type, value) => {
+        const newDate = new Date(value);
+        newDate.setHours(0, 0, 0, 0); // Set to start of day
+        
+        const currentStart = new Date(startDate);
+        currentStart.setHours(0, 0, 0, 0);
+        
+        const currentEnd = new Date(endDate);
+        currentEnd.setHours(0, 0, 0, 0);
+        
+        if (type === 'start') {
+            if (newDate > currentEnd) {
+                setError("Start date cannot be after end date");
+                return;
+            }
+            setStartDate(value);
+        } else {
+            if (newDate < currentStart) {
+                setError("End date cannot be before start date");
+                return;
+            }
+            setEndDate(value);
+        }
+        setError(null);
+    };
+
+    // Fetches weight and calorie trend charts
     useEffect(() => {
-        if (!token) return;
+        if (!token || !startDate || !endDate) return;
 
         const authHeader = { Authorization: `Bearer ${token}` };
-        const params = { period_days: periodOption === 'week' ? 7 : 30 };
+        const params = { startDate, endDate };
         setError(null);
 
-        // Fetch Weight Trend
+        // Weight trend
         setIsLoadingWeight(true);
         axios.get('/api/statistics/weight-trend', { params, headers: authHeader })
             .then(response => {
+                console.log('Weight trend raw data:', response.data);
                 const data = response.data;
                 if (Array.isArray(data) && data.length > 0) {
-                    const labels = data.map(d => new Date(d.date + "T00:00:00").toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                    // Sort data by date to ensure correct order
+                    const sortedData = [...data].sort((a, b) => new Date(a.date) - new Date(b.date));
+                    console.log('Weight trend sorted data:', sortedData);
+                    
+                    const labels = sortedData.map(d => formatDateForDisplay(d.date));
                     setWeightTrendData({
                         labels,
                         datasets: [{
-                            label: 'Weight', data: data.map(d => d.weight), borderColor: 'rgb(153, 102, 255)',
-                            backgroundColor: 'rgba(153, 102, 255, 0.2)', tension: 0.1, fill: 'origin',
-                            pointRadius: 3, pointHoverRadius: 6,
+                            label: 'Weight (kg)',
+                            data: sortedData.map(d => d.weight),
+                            borderColor: 'rgb(153, 102, 255)',
+                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                            tension: 0.1,
+                            fill: 'origin',
+                            pointRadius: 3,
+                            pointHoverRadius: 6,
                         }]
                     });
-                } else { setWeightTrendData(null); }
+                } else {
+                    setWeightTrendData(null);
+                }
             })
-            .catch(err => { console.error("Fetch weight trend error:", err); setError("Could not load weight trend."); })
+            .catch(err => {
+                console.error("Weight trend error:", err);
+                setError("Failed to load weight trend.");
+            })
             .finally(() => setIsLoadingWeight(false));
 
-        // Fetch Calorie Trend
+        // Calorie trend
         setIsLoadingTrend(true);
         axios.get('/api/statistics/calories-trend', { params, headers: authHeader })
             .then(response => {
                 const data = response.data;
                 if (Array.isArray(data) && data.length > 0) {
-                    const labels = data.map(d => new Date(d.date + "T00:00:00").toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                    const labels = data.map(d => formatDateForDisplay(d.date));
                     setCalorieTrendData({
                         labels,
                         datasets: [
-                            { label: 'Consumed', data: data.map(d => d.consumed), borderColor: 'rgb(255, 99, 132)', backgroundColor: 'rgba(255, 99, 132, 0.2)', tension: 0.1, fill: 'origin' },
-                            { label: 'Burned (Exercise)', data: data.map(d => d.burned), borderColor: 'rgb(54, 162, 235)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.1, fill: 'origin' },
-                            { label: 'Net', data: data.map(d => d.consumed - d.burned), borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.2)', tension: 0.1, fill: false }
+                            {
+                                label: 'Consumed',
+                                data: data.map(d => d.consumed),
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                tension: 0.1,
+                                fill: 'origin'
+                            },
+                            {
+                                label: 'Burned',
+                                data: data.map(d => d.burned),
+                                borderColor: 'rgb(54, 162, 235)',
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                tension: 0.1,
+                                fill: 'origin'
+                            },
+                            {
+                                label: 'Net',
+                                data: data.map(d => d.consumed - d.burned),
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                tension: 0.1,
+                                fill: false
+                            }
                         ]
                     });
-                } else { setCalorieTrendData(null); }
+                } else {
+                    setCalorieTrendData(null);
+                }
             })
-            .catch(err => { console.error("Fetch calorie trend error:", err); setError("Could not load calorie trend."); })
+            .catch(err => {
+                console.error("Calorie trend error:", err);
+                setError("Failed to load calorie trend.");
+            })
             .finally(() => setIsLoadingTrend(false));
 
-    }, [token, periodOption]);
+    }, [token, startDate, endDate]);
 
-    // Effect for fetching Period Summary and Macronutrient Distribution (they use the same date range parameters)
+    // Fetches period summary and macro split
     useEffect(() => {
-        if (!token) return;
-
+        if (!token || !startDate || !endDate) return;
         const authHeader = { Authorization: `Bearer ${token}` };
-        // Logic for calculating date range is now correctly placed inside the effect
-        const today = new Date();
-        let startDate, endDate = formatDateForAPI(today);
-        if (periodOption === 'week') {
-            const lastWeek = new Date(today);
-            lastWeek.setDate(today.getDate() - 6);
-            startDate = formatDateForAPI(lastWeek);
-        } else { // 'month'
-            const lastMonth = new Date(today);
-            lastMonth.setDate(today.getDate() - 29);
-            startDate = formatDateForAPI(lastMonth);
-        }
         const params = { startDate, endDate };
         setError(null);
 
-        // Fetch Period Summary
         setIsLoadingSummary(true);
         axios.get('/api/statistics/period-summary', { params, headers: authHeader })
-            .then(response => {
-                setPeriodSummary(response.data);
+            .then(response => setPeriodSummary(response.data))
+            .catch(err => {
+                console.error("Period summary error:", err);
+                setError("Failed to load period summary.");
             })
-            .catch(err => { console.error("Fetch period summary error:", err); setError("Could not load period summary."); })
             .finally(() => setIsLoadingSummary(false));
 
-        // Fetch Macronutrient Distribution
         setIsLoadingMacros(true);
         axios.get('/api/statistics/macronutrient-distribution', { params, headers: authHeader })
             .then(response => {
                 const data = response.data;
-                if (data && typeof data.protein_pct === 'number' && data.protein_pct > 0) {
+                if (data && typeof data.protein_pct === 'number') {
                     setMacroDistribution({
                         labels: ['Protein', 'Fat', 'Carbs'],
                         datasets: [{
-                            label: 'Macronutrient Distribution (%)',
+                            label: 'Macronutrient %',
                             data: [data.protein_pct, data.fat_pct, data.carbs_pct],
-                            backgroundColor: ['rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)', 'rgba(255, 99, 132, 0.7)'],
+                            backgroundColor: [
+                                'rgba(54, 162, 235, 0.7)',
+                                'rgba(255, 206, 86, 0.7)',
+                                'rgba(255, 99, 132, 0.7)'
+                            ],
                         }]
                     });
-                } else { setMacroDistribution(null); }
+                } else {
+                    setMacroDistribution(null);
+                }
             })
-            .catch(err => { console.error("Fetch macro distribution error:", err); setError("Could not load macro distribution."); })
+            .catch(err => {
+                console.error("Macro distribution error:", err);
+                setError("Failed to load macro distribution.");
+            })
             .finally(() => setIsLoadingMacros(false));
 
-    }, [token, periodOption]);
+    }, [token, startDate, endDate]);
 
     const isLoading = isLoadingWeight || isLoadingTrend || isLoadingSummary || isLoadingMacros;
 
-    // Chart.js options
     const chartOptions = (title) => ({
         responsive: true,
         plugins: {
-            title: { display: true, text: `${title} - Last ${periodOption === 'week' ? '7' : '30'} Days` }
+            title: {
+                display: true,
+                text: `${title} (${formatDateForDisplay(startDate)} to ${formatDateForDisplay(endDate)})`
+            }
+        },
+        scales: {
+            y: {
+                title: {
+                    display: true,
+                    text: title === 'Weight Trend' ? 'Weight (kg)' : 'Calories'
+                }
+            }
         }
     });
 
     return (
-        <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-8 text-center">My Statistics</h1>
+        <div className="max-w-6xl mx-auto p-4 space-y-8">
+            <h1 className="text-3xl font-bold text-center text-gray-800 dark:text-white">My Statistics</h1>
 
-            <div className="mb-6 flex items-center justify-center space-x-2">
-                <label htmlFor="periodSelectStats" className="text-sm font-medium text-gray-700 dark:text-gray-300">View data for:</label>
-                <select
-                    id="periodSelectStats"
-                    value={periodOption}
-                    onChange={(e) => setPeriodOption(e.target.value)}
-                    className="border border-gray-300 rounded-md p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                >
-                    <option value="week">Last 7 Days</option>
-                    <option value="month">Last 30 Days</option>
-                </select>
+            {/* Date range selection */}
+            <div className="flex flex-wrap justify-center gap-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Date:</label>
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => handleDateChange('start', e.target.value)}
+                        max={endDate}
+                        className="border p-2 rounded dark:bg-gray-700 dark:text-white"
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">End Date:</label>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => handleDateChange('end', e.target.value)}
+                        min={startDate}
+                        max={formatDateForAPI(new Date())}
+                        className="border p-2 rounded dark:bg-gray-700 dark:text-white"
+                    />
+                </div>
             </div>
 
-            {isLoading && <p className="text-center text-gray-500 py-10">Loading statistics...</p>}
-            {error && <p className="text-center text-red-500 bg-red-100 p-3 rounded-md">{error}</p>}
+            {isLoading && <p className="text-center text-gray-500">Loading statistics...</p>}
+            {error && <p className="text-center text-red-500 bg-red-100 p-3 rounded">{error}</p>}
 
             {!isLoading && !error && (
                 <div className="space-y-8">
-                    <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-lg">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
                         {weightTrendData ?
                             <LineChartComponent chartData={weightTrendData} chartOptions={chartOptions('Weight Trend')} /> :
-                            <p className="text-center text-gray-500 py-10">No weight data available for this period.</p>
+                            <p className="text-center text-gray-500">No weight data for selected dates.</p>
                         }
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-lg">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
                             {calorieTrendData ?
-                                <LineChartComponent chartData={calorieTrendData} chartOptions={chartOptions('Calorie & Activity Trend')} /> :
-                                <p className="text-center text-gray-500 py-10">No calorie data available for this period.</p>
+                                <LineChartComponent chartData={calorieTrendData} chartOptions={chartOptions('Calories & Burn')} /> :
+                                <p className="text-center text-gray-500">No calorie data for selected dates.</p>
                             }
                         </div>
-                        <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-lg">
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
                             {macroDistribution ?
-                                <PieChartComponent chartData={macroDistribution} chartOptions={chartOptions('Macronutrient Distribution')} /> :
-                                <p className="text-center text-gray-500 py-10">No macronutrient data available for this period.</p>
+                                <PieChartComponent chartData={macroDistribution} chartOptions={chartOptions('Macros')} /> :
+                                <p className="text-center text-gray-500">No macro data for selected dates.</p>
                             }
                         </div>
                     </div>
@@ -185,24 +305,26 @@ export default function StatisticsPage() {
             )}
 
             {!isLoadingSummary && !error && periodSummary && (
-                <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-lg mt-8">
-                    <h2 className="text-xl font-semibold text-gray-700 dark:text-white mb-4 text-center">
-                        Summary for {periodSummary.period.startDate} to {periodSummary.period.endDate}
+                <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
+                    <h2 className="text-xl font-semibold text-center text-gray-800 dark:text-white">
+                        Summary: {formatDateForDisplay(periodSummary.period.startDate)} → {formatDateForDisplay(periodSummary.period.endDate)}
                     </h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 text-sm">
-                        {[
-                            { label: "Avg Daily Calories", value: periodSummary.avg_daily_kcal_consumed, unit: "kcal" },
-                            { label: "Avg Daily Protein", value: periodSummary.avg_daily_protein, unit: "g" },
-                            { label: "Avg Daily Fat", value: periodSummary.avg_daily_fat, unit: "g" },
-                            { label: "Avg Daily Carbs", value: periodSummary.avg_daily_carbs, unit: "g" },
-                            { label: "Total Exercise Burn", value: periodSummary.total_kcal_burned_exercise, unit: "kcal" },
-                            { label: "Avg Daily Exercise Burn", value: periodSummary.avg_daily_kcal_burned_exercise, unit: "kcal" },
-                            { label: "Days Food Logged", value: `${periodSummary.days_with_food_log} / ${periodSummary.period.days}` },
-                            { label: "Days Activity Logged", value: `${periodSummary.days_with_activity_log} / ${periodSummary.period.days}` },
-                        ].map(stat => (
-                            <div key={stat.label} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg text-center">
-                                <p className="font-medium text-gray-600 dark:text-gray-200">{stat.label}</p>
-                                <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">{stat.value} {stat.unit || ''}</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
+                        {[ // Summary stats block
+                            { label: 'Avg Calories', value: periodSummary.avg_daily_kcal_consumed, unit: 'kcal' },
+                            { label: 'Protein', value: periodSummary.avg_daily_protein, unit: 'g' },
+                            { label: 'Fat', value: periodSummary.avg_daily_fat, unit: 'g' },
+                            { label: 'Carbs', value: periodSummary.avg_daily_carbs, unit: 'g' },
+                            { label: 'Total Burned', value: periodSummary.total_kcal_burned_exercise, unit: 'kcal' },
+                            { label: 'Avg Burned', value: periodSummary.avg_daily_kcal_burned_exercise, unit: 'kcal' },
+                            { label: 'Food Log Days', value: `${periodSummary.days_with_food_log} / ${periodSummary.period.days}` },
+                            { label: 'Activity Days', value: `${periodSummary.days_with_activity_log} / ${periodSummary.period.days}` },
+                        ].map(item => (
+                            <div key={item.label} className="bg-gray-100 dark:bg-gray-700 p-3 rounded text-center">
+                                <div className="text-sm text-gray-600 dark:text-gray-300">{item.label}</div>
+                                <div className="text-lg font-semibold text-gray-800 dark:text-white">
+                                    {item.value}{item.unit ? ` ${item.unit}` : ''}
+                                </div>
                             </div>
                         ))}
                     </div>

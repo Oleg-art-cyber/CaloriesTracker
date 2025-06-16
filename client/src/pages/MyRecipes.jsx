@@ -4,6 +4,10 @@ import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import RecipeForm from '../components/RecipeForm.jsx';
 
+/**
+ * MyRecipes component for managing user recipes
+ * Allows users to view, add, edit, and delete recipes
+ */
 export default function MyRecipes() {
     const { token } = useContext(AuthContext);
     const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
@@ -20,6 +24,9 @@ export default function MyRecipes() {
     const [showForm, setShowForm] = useState(false);
     const [editingRecipe, setEditingRecipe] = useState(null); // Stores full recipe object for the form
 
+    /**
+     * Fetches the list of recipes from the server
+     */
     const fetchRecipes = async () => {
         if (!token) { setRecipes([]); return; }
         setIsLoadingList(true);
@@ -40,6 +47,10 @@ export default function MyRecipes() {
         fetchRecipes();
     }, [token]);
 
+    /**
+     * Handles the deletion of a recipe
+     * @param {number} recipeId - ID of the recipe to delete
+     */
     const handleDelete = async (recipeId) => {
         if (!confirm('Are you sure you want to delete this recipe? This cannot be undone.')) return;
         try {
@@ -51,6 +62,10 @@ export default function MyRecipes() {
         }
     };
 
+    /**
+     * Handles viewing or editing a recipe
+     * @param {Object} recipeSummary - Summary of the recipe to view or edit
+     */
     const handleViewOrEdit = async (recipeSummary) => {
         if (isLoadingDetailsForId === recipeSummary.id) return; // Prevent re-fetching if already loading this one
 
@@ -68,11 +83,17 @@ export default function MyRecipes() {
         }
     };
 
+    /**
+     * Handles adding a new recipe
+     */
     const handleAdd = () => {
         setEditingRecipe(null);
         setShowForm(true);
     };
 
+    /**
+     * Handles closing the recipe form and refreshes the recipe list
+     */
     const handleFormClose = () => {
         setShowForm(false);
         setEditingRecipe(null);

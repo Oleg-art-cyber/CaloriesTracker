@@ -3,6 +3,9 @@ import { useState, useEffect, useContext, useCallback } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 
+/**
+ * Default profile state with empty values
+ */
 const DEFAULT_PROFILE = {
     name: '', email: '', weight: '', height: '', age: '',
     goal: 'maintain', gender: '', activity_level: 'sedentary',
@@ -13,6 +16,9 @@ const DEFAULT_PROFILE = {
     calculated_target_calories: null,
 };
 
+/**
+ * Activity level options for user selection
+ */
 const ACTIVITY_LEVEL_OPTIONS = [
     { value: 'sedentary', label: 'Sedentary (little or no exercise)' },
     { value: 'light', label: 'Lightly Active (light exercise/sports 1-3 days/wk)' },
@@ -21,16 +27,26 @@ const ACTIVITY_LEVEL_OPTIONS = [
     { value: 'very_active', label: 'Very Active (very hard exercise & physical job)' },
 ];
 
+/**
+ * BMR formula options for calorie calculation
+ */
 const BMR_FORMULA_OPTIONS = [
     { value: 'mifflin_st_jeor', label: 'Mifflin-St Jeor (Recommended)' },
     { value: 'harris_benedict', label: 'Harris-Benedict (Revised)' },
     { value: 'katch_mcardle', label: 'Katch-McArdle (Needs Body Fat %)' },
 ];
 
+/**
+ * Activity level multipliers for TDEE calculation
+ */
 const APPROX_ACTIVITY_MULTIPLIERS = {
     sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9
 };
 
+/**
+ * Profile page component for managing user profile information
+ * Handles user's personal details, physical stats, goals, and calorie calculation preferences
+ */
 export default function ProfilePage() {
     const { token } = useContext(AuthContext);
 
@@ -43,6 +59,10 @@ export default function ProfilePage() {
     const [successMessage, setSuccessMessage] = useState('');
     const [isEditing, setIsEditing] = useState(false);
 
+    /**
+     * Fetches user profile data from the server
+     * Updates state with fetched data or sets default values if not authenticated
+     */
     const fetchProfile = useCallback(async () => {
         if (!token) { setIsLoading(false); setProfile(DEFAULT_PROFILE); setInitialProfile(DEFAULT_PROFILE); return; }
         setIsLoading(true); setError(''); setSuccessMessage('');
@@ -77,6 +97,10 @@ export default function ProfilePage() {
         fetchProfile();
     }, [fetchProfile]);
 
+    /**
+     * Handles changes in form inputs
+     * @param {Event} e - Input change event
+     */
     const handleChange = (e) => {
         const { name, value } = e.target;
         setProfile(prev => ({ ...prev, [name]: value }));
@@ -84,6 +108,11 @@ export default function ProfilePage() {
         setSuccessMessage('');
     };
 
+    /**
+     * Handles form submission for profile updates
+     * Validates input data and sends update request to server
+     * @param {Event} e - Form submit event
+     */
     const handleSave = async (e) => {
         e.preventDefault();
         setError(''); setSuccessMessage(''); setIsSaving(true);
@@ -128,6 +157,10 @@ export default function ProfilePage() {
         } finally { setIsSaving(false); }
     };
 
+    /**
+     * Handles cancellation of profile editing
+     * Resets form to initial state
+     */
     const handleCancelEdit = () => {
         setProfile(initialProfile);
         setIsEditing(false); setError(''); setSuccessMessage('');

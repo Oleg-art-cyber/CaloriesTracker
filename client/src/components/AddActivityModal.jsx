@@ -3,12 +3,13 @@ import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 
+/**
+ * AddActivityModal
+ * Modal component for logging physical activities (e.g. running, walking).
+ * Allows users to search, select an exercise, enter duration, and submit the entry.
+ */
 export default function AddActivityModal({ date, onClose, reloadDiary }) {
     const { token } = useContext(AuthContext);
-    // authHeader будет создан внутри useEffect или при отправке запроса,
-    // чтобы не быть в зависимостях useEffect, если он не мемоизирован.
-    // Либо, если мы хотим его использовать, мы должны мемоизировать его с useMemo.
-    // Но проще всего использовать сам токен как зависимость.
 
     const [allExercises, setAllExercises] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -18,18 +19,16 @@ export default function AddActivityModal({ date, onClose, reloadDiary }) {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    /**
+     * Fetches all exercises from the backend when the component is mounted or token changes.
+     */
     useEffect(() => {
-        // console.log("AddActivityModal: useEffect for loading exercises triggered. Token:", token);
         if (token) {
             setIsLoading(true);
-            const currentAuthHeader = { Authorization: `Bearer ${token}` }; // Create header inside effect
+            const currentAuthHeader = { Authorization: `Bearer ${token}` };
             axios.get('/api/exercises', { headers: currentAuthHeader })
                 .then(res => {
-                    // console.log("AddActivityModal: Exercises loaded:", res.data);
                     setAllExercises(Array.isArray(res.data) ? res.data : []);
-                    // if (res.data.length > 0 && !selectedExerciseId) { // Only pre-select if nothing is selected
-                    //    setSelectedExerciseId(res.data[0].id);
-                    // }
                 })
                 .catch(e => {
                     console.error("AddActivityModal: Failed to load exercises", e);
@@ -37,22 +36,29 @@ export default function AddActivityModal({ date, onClose, reloadDiary }) {
                 })
                 .finally(() => setIsLoading(false));
         } else {
-            // console.log("AddActivityModal: No token, not loading exercises.");
-            setAllExercises([]); // Clear exercises if no token
+            setAllExercises([]);
         }
-    }, [token]); // Dependency is only 'token'. When token changes, effect runs.
+    }, [token]);
 
+    /**
+     * Filters exercises by search term.
+     */
     const filteredExercises = searchTerm.trim() === ''
         ? allExercises
         : allExercises.filter(ex => ex.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
+    /**
+     * Handles the submission of a new activity log.
+     */
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+
         if (!selectedExerciseId) {
             setError('Please select an exercise.');
             return;
         }
+
         const numDuration = parseInt(duration, 10);
         if (isNaN(numDuration) || numDuration <= 0) {
             setError('Duration must be a positive number of minutes.');
@@ -67,7 +73,7 @@ export default function AddActivityModal({ date, onClose, reloadDiary }) {
 
         setIsLoading(true);
         try {
-            const currentAuthHeader = { Authorization: `Bearer ${token}` }; // Create header for this request
+            const currentAuthHeader = { Authorization: `Bearer ${token}` };
             await axios.post('/api/physical-activity', payload, { headers: currentAuthHeader });
             reloadDiary();
             onClose();
@@ -108,13 +114,17 @@ export default function AddActivityModal({ date, onClose, reloadDiary }) {
                         required
                         disabled={isLoading && allExercises.length === 0}
                     >
-                        <option value="" disabled>{isLoading && allExercises.length === 0 && !error ? "Loading..." : "Select an exercise"}</option>
+                        <option value="" disabled>
+                            {isLoading && allExercises.length === 0 && !error
+                                ? "Loading..."
+                                : "Select an exercise"}
+                        </option>
                         {error && <option disabled>Error loading exercises</option>}
                         {!error && filteredExercises.map(ex => (
                             <option key={ex.id} value={ex.id}>
                                 {ex.name}
                                 {ex.met_value ? ` (MET: ${ex.met_value})` : ''}
-                                {ex.calories_per_minute ? ` (${ex.calories_per_minute} kcal/min)`: ''}
+                                {ex.calories_per_minute ? ` (${ex.calories_per_minute} kcal/min)` : ''}
                             </option>
                         ))}
                     </select>
@@ -137,10 +147,18 @@ export default function AddActivityModal({ date, onClose, reloadDiary }) {
                 {error && <p className="text-sm text-red-600 bg-red-100 p-2 rounded-md">{error}</p>}
 
                 <div className="flex justify-end gap-3 pt-3 border-t">
-                    <button type="button" onClick={onClose} className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 transition">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 transition"
+                    >
                         Cancel
                     </button>
-                    <button type="submit" disabled={isLoading} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition disabled:opacity-50">
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition disabled:opacity-50"
+                    >
                         {isLoading ? 'Logging...' : 'Log Activity'}
                     </button>
                 </div>

@@ -3,12 +3,18 @@ import axios from 'axios';
 import { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 
+/**
+ * MealItemRow component displays and manages a single meal item in the diary
+ * @param {Object} item - The meal item data (product or recipe)
+ * @param {Function} reload - Callback function to reload the diary data
+ */
 export default function MealItemRow({ item, reload }) {
     const { token } = useContext(AuthContext);
     const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
 
     const [editableAmount, setEditableAmount] = useState('');
 
+    // Initialize editable amount based on item type
     useEffect(() => {
         if (item.type === 'product') {
             setEditableAmount(String(item.amount_grams || ''));
@@ -17,10 +23,18 @@ export default function MealItemRow({ item, reload }) {
         }
     }, [item]);
 
+    /**
+     * Handles changes to the amount input field
+     * @param {Event} e - The change event
+     */
     const handleAmountChange = (e) => {
         setEditableAmount(e.target.value);
     };
 
+    /**
+     * Saves the updated amount to the server
+     * Validates input and handles errors
+     */
     const handleSaveAmount = async () => {
         // Prevent saving if the value hasn't actually changed or is empty
         const originalValueStr = String(item.type === 'product' ? item.amount_grams : item.servings_consumed);
@@ -41,7 +55,7 @@ export default function MealItemRow({ item, reload }) {
         if (item.type === 'product') {
             // Ensure we don't send PATCH if value hasn't effectively changed
             if (numValue === parseFloat(item.amount_grams)) return;
-            payload = { amountGrams: numValue }; // <--- ИЗМЕНЕНО ЗДЕСЬ: 'amount' на 'amountGrams'
+            payload = { amountGrams: numValue };
         } else if (item.type === 'recipe') {
             if (numValue === parseFloat(item.servings_consumed)) return;
             payload = { servingsConsumed: numValue };
@@ -54,7 +68,7 @@ export default function MealItemRow({ item, reload }) {
             await axios.patch(
                 `/api/diary/item/${item.meal_product_id}`,
                 payload,
-                { headers: authHeader } // Still relying on authHeader here, ensure it's correct or remove if axios defaults are enough
+                { headers: authHeader }
             );
             reload();
         } catch (e) {
@@ -64,12 +78,16 @@ export default function MealItemRow({ item, reload }) {
         }
     };
 
+    /**
+     * Removes the meal item from the diary
+     * Confirms with user before deletion
+     */
     const handleRemoveItem = async () => {
         if (!confirm(`Are you sure you want to remove "${item.name}" from this meal?`)) return;
         try {
             await axios.delete(
                 `/api/diary/item/${item.meal_product_id}`,
-                { headers: authHeader } // Same as above for authHeader
+                { headers: authHeader }
             );
             reload();
         } catch (e) {

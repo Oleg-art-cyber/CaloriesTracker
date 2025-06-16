@@ -1,6 +1,12 @@
 // server/src/controllers/products.js
 // Product CRUD controller with user ownership, public flag, search + pagination
 
+/**
+ * Products Controller
+ * Manages product CRUD operations with user ownership and public/private visibility.
+ * Includes search functionality and pagination support.
+ * Handles product validation and category management.
+ */
 const Joi = require('joi');
 const db  = require('../config/dbSingleton');
 const connection = db.getConnection();
@@ -32,6 +38,12 @@ const productSchema = Joi.object({
     category_id: Joi.number().valid(...allowedIds).default(() => idOther)
 });
 
+/**
+ * Validates the request body against the product schema
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Object|null} Validated body object or null if validation fails
+ */
 function validateBody(req, res) {
     const { error, value } = productSchema.validate(req.body);
     if (error) {
@@ -44,6 +56,23 @@ function validateBody(req, res) {
 /* ───────────────────────────────────────────
    GET /api/products  (search + pagination)
 ─────────────────────────────────────────── */
+/**
+ * Retrieves all products with search and pagination
+ * @param {Object} req - Express request object containing user info and query parameters
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing paginated products and metadata
+ * 
+ * Query parameters:
+ * - q: Search query string
+ * - page: Page number (default: 1)
+ * - limit: Items per page (default: 10)
+ * 
+ * Response includes:
+ * - data: Array of products with category information
+ * - total: Total number of matching products
+ * - page: Current page number
+ * - limit: Items per page
+ */
 exports.getAll = (req, res) => {
     const userId  = req.user.id;
     const isAdmin = req.user.role === 'admin';
@@ -89,6 +118,19 @@ exports.getAll = (req, res) => {
 /* ───────────────────────────────────────────
    GET /api/products/:id
 ─────────────────────────────────────────── */
+/**
+ * Retrieves a single product by ID
+ * @param {Object} req - Express request object containing product ID and user info
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing product details
+ * 
+ * URL parameters:
+ * - id: Product ID to retrieve
+ * 
+ * Response includes:
+ * - Complete product information
+ * - Associated category name
+ */
 exports.getOne = (req, res) => {
     const userId  = req.user.id;
     const isAdmin = req.user.role === 'admin';
@@ -115,6 +157,20 @@ exports.getOne = (req, res) => {
 /* ───────────────────────────────────────────
    POST /api/products
 ─────────────────────────────────────────── */
+/**
+ * Creates a new product
+ * @param {Object} req - Express request object containing product data
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing created product details
+ * 
+ * Request body must include:
+ * - name: Product name (min 2 chars)
+ * - calories: Positive number
+ * - fat: Non-negative number
+ * - protein: Non-negative number
+ * - carbs: Non-negative number
+ * - category_id: Valid category ID (optional, defaults to 'other')
+ */
 exports.create = (req, res) => {
     const body = validateBody(req, res);
     if (!body) return;
@@ -146,6 +202,23 @@ exports.create = (req, res) => {
 /* ───────────────────────────────────────────
    PUT /api/products/:id
 ─────────────────────────────────────────── */
+/**
+ * Updates an existing product
+ * @param {Object} req - Express request object containing product ID and update data
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing updated product details
+ * 
+ * URL parameters:
+ * - id: Product ID to update
+ * 
+ * Request body must include:
+ * - name: Updated product name
+ * - calories: Updated calorie value
+ * - fat: Updated fat value
+ * - protein: Updated protein value
+ * - carbs: Updated carbs value
+ * - category_id: Updated category ID
+ */
 exports.update = (req, res) => {
     const body = validateBody(req, res);
     if (!body) return;
@@ -172,6 +245,18 @@ exports.update = (req, res) => {
 /* ───────────────────────────────────────────
    DELETE /api/products/:id
 ─────────────────────────────────────────── */
+/**
+ * Deletes a product
+ * @param {Object} req - Express request object containing product ID
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response confirming deletion
+ * 
+ * URL parameters:
+ * - id: Product ID to delete
+ * 
+ * Response includes:
+ * - message: Confirmation message with deleted product ID
+ */
 exports.remove = (req, res) => {
     connection.query(
         'DELETE FROM product WHERE id = ?',

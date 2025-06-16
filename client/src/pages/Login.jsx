@@ -2,6 +2,10 @@ import { useContext, useState } from 'react'
 import { AuthContext }        from '../context/AuthContext'
 import { useNavigate, Link }  from 'react-router-dom'
 
+/**
+ * Login component for user authentication
+ * Allows users to sign in with email and password
+ */
 export default function Login() {
     const { login } = useContext(AuthContext)
     const navigate  = useNavigate()
@@ -9,7 +13,8 @@ export default function Login() {
     const [error, setError]  = useState(null)
 
     /**
-     * Attempt to log in; on success, redirect to products page
+     * Attempts to log in the user
+     * On success, redirects to the products page
      */
     async function handleSubmit() {
         try {
@@ -50,7 +55,7 @@ export default function Login() {
                 </button>
 
                 <p className="text-center text-sm">
-                    Don’t have an account?{' '}
+                    Don't have an account?{' '}
                     <Link to="/register" className="text-blue-600 hover:underline">
                         Register here
                     </Link>

@@ -1,9 +1,25 @@
-// server/controllers/recipes.js
+/**
+ * Recipes Controller
+ * Manages recipe creation, retrieval, and updates.
+ * Handles recipe ingredients and their nutritional information.
+ */
 const dbSingleton = require('../config/dbSingleton'); // Path to db connection singleton
 const conn = dbSingleton.getConnection();
 
-// --- GET /api/recipes ---
-// Fetches public recipes and recipes created by the authenticated user.
+/**
+ * Retrieves all recipes available to the user
+ * Returns both public recipes and those created by the user
+ * @param {Object} req - Express request object containing user ID
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing array of recipes
+ * 
+ * Response includes:
+ * - Recipe details (ID, name, description)
+ * - Creator information
+ * - Public/private status
+ * - Serving information
+ * - Timestamps
+ */
 exports.getAllUserRecipes = (req, res) => {
     const userId = req.user.id; // User ID from authMiddleware
 
@@ -26,9 +42,21 @@ exports.getAllUserRecipes = (req, res) => {
     });
 };
 
-// --- GET /api/recipes/:id ---
-// Fetches a single recipe by ID, including its ingredients and their nutritional info.
-// Access is restricted for private recipes not owned by the user.
+/**
+ * Retrieves a single recipe by ID with its ingredients and nutritional information
+ * Enforces access control for private recipes
+ * @param {Object} req - Express request object containing recipe ID and user ID
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing recipe details and ingredients
+ * 
+ * URL parameters:
+ * - id: Recipe ID to retrieve
+ * 
+ * Response includes:
+ * - Complete recipe information
+ * - List of ingredients with nutritional values
+ * - Creator details
+ */
 exports.getRecipeById = (req, res) => {
     const recipeId = parseInt(req.params.id, 10);
     const userId = req.user.id;
@@ -85,8 +113,20 @@ exports.getRecipeById = (req, res) => {
     });
 };
 
-// --- POST /api/recipes ---
-// Creates a new recipe and its associated ingredients in a transaction.
+/**
+ * Creates a new recipe with its ingredients
+ * Uses a transaction to ensure data consistency
+ * @param {Object} req - Express request object containing recipe data
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing created recipe details
+ * 
+ * Request body must include:
+ * - name: Recipe name
+ * - ingredients: Array of ingredients with productId and amountGrams
+ * - is_public: Boolean indicating if recipe is public
+ * - total_servings: Number of servings (defaults to 1)
+ * - description: Optional recipe description
+ */
 exports.createRecipe = (req, res) => {
     const { name, description, is_public, total_servings = 1, ingredients } = req.body;
     const user_id = req.user.id;
@@ -164,8 +204,23 @@ exports.createRecipe = (req, res) => {
     });
 };
 
-// --- PUT /api/recipes/:id ---
-// Updates an existing recipe and its ingredients. Replaces all old ingredients with new ones.
+/**
+ * Updates an existing recipe and its ingredients
+ * Replaces all existing ingredients with new ones
+ * @param {Object} req - Express request object containing recipe ID and update data
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing updated recipe details
+ * 
+ * URL parameters:
+ * - id: Recipe ID to update
+ * 
+ * Request body may include:
+ * - name: Updated recipe name
+ * - description: Updated recipe description
+ * - is_public: Updated public status
+ * - total_servings: Updated number of servings
+ * - ingredients: New array of ingredients
+ */
 exports.updateRecipe = (req, res) => {
     const recipeId = parseInt(req.params.id, 10);
     const { name, description, is_public, total_servings, ingredients } = req.body;

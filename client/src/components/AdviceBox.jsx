@@ -1,7 +1,11 @@
 // client/src/components/AdviceBox.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 
-// --- Helper function to calculate a very basic target calorie goal ---
+/**
+ * Calculates target calories based on user profile data using the Mifflin-St Jeor equation
+ * @param {Object} profile - User profile containing weight, height, age, gender, activity_level, and goal
+ * @returns {number} Target calorie goal
+ */
 const calculateTargetCalories = (profile) => {
     if (!profile || !profile.weight || !profile.height || !profile.age) {
         // console.warn("AdviceBox: Profile data incomplete for calorie calculation, using default 2000kcal.");
@@ -230,6 +234,11 @@ const ADVICE_BANK = [
 const MAX_INITIALLY_VISIBLE_ADVICE = 2; // Show up to 2 initially
 const MAX_TOTAL_VISIBLE_ADVICE = 6;     // Show up to 6 when "show more" is clicked
 
+/**
+ * AdviceBox component that displays personalized advice based on user's profile and diary data
+ * @param {Object} userProfile - User's profile information
+ * @param {Object} diaryData - User's diary data including meals and summary
+ */
 export default function AdviceBox({ userProfile, diaryData }) {
     const [allApplicableAdvice, setAllApplicableAdvice] = useState([]);
     const [showAll, setShowAll] = useState(false);

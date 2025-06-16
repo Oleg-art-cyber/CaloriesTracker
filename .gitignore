@@ -1,14 +1,35 @@
-# зависимости и сборка
+# Dependencies
 node_modules/
-dist/
-coverage/
+client/node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build files
+client/dist/
+client/build/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # IDE
 .idea/
+.vscode/
+*.swp
+*.swo
 
-# конфиги
-.env
-.idea/
-
-# macOS
+# OS
 .DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp

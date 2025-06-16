@@ -1,8 +1,16 @@
 // client/src/components/ExerciseForm.jsx
+
 import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 
+/**
+ * ExerciseForm component for creating and editing exercise definitions
+ * Provides form validation and handles API communication
+ * @param {Object} exercise - Existing exercise data for editing (optional)
+ * @param {Function} onSuccess - Callback function called after successful submission
+ * @param {Function} onClose - Callback function to close the form
+ */
 export default function ExerciseForm({ exercise, onSuccess, onClose }) {
     const { token } = useContext(AuthContext);
     const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
@@ -16,6 +24,10 @@ export default function ExerciseForm({ exercise, onSuccess, onClose }) {
     });
     const [err, setErr] = useState(null);
 
+    /**
+     * Populates form fields with existing exercise data when editing
+     * Resets form to default values when creating new exercise
+     */
     useEffect(() => {
         if (exercise) {
             setForm({
@@ -36,19 +48,30 @@ export default function ExerciseForm({ exercise, onSuccess, onClose }) {
         }
     }, [exercise]);
 
+    /**
+     * Handles changes to form input fields
+     * Updates form state and clears any previous errors
+     * @param {Event} e - Form input change event
+     */
     function handleChange(e) {
         const { name, value, type, checked } = e.target;
         setForm(prev => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value,
         }));
-        setErr(null); // Сбросить ошибку при изменении
+        setErr(null);
     }
 
+    /**
+     * Handles form submission
+     * Validates input data and sends to server
+     * @param {Event} e - Form submit event
+     */
     async function handleSubmit(e) {
         e.preventDefault();
         setErr(null);
 
+        // Basic validation
         if (!form.name.trim()) {
             setErr('Exercise name is required.');
             return;
@@ -66,7 +89,7 @@ export default function ExerciseForm({ exercise, onSuccess, onClose }) {
             return;
         }
 
-
+        // Prepare data for API
         const payload = {
             name: form.name,
             description: form.description.trim() ? form.description.trim() : null,
@@ -76,13 +99,15 @@ export default function ExerciseForm({ exercise, onSuccess, onClose }) {
         };
 
         try {
-            if (exercise) { // Редактирование
+            if (exercise) {
+                // Update existing exercise
                 await axios.put(`/api/exercises/${exercise.id}`, payload, { headers: authHeader });
-            } else { // Создание
+            } else {
+                // Create new exercise
                 await axios.post('/api/exercises', payload, { headers: authHeader });
             }
-            onSuccess(); // Обновить список на родительской странице
-            onClose();   // Закрыть модальное окно
+            onSuccess();
+            onClose();
         } catch (e) {
             console.error(e);
             setErr(e.response?.data?.error || 'Server error. Please try again.');
@@ -154,7 +179,6 @@ export default function ExerciseForm({ exercise, onSuccess, onClose }) {
                 </div>
                 <p className="text-xs text-gray-500">Provide either MET value or Calories per minute.</p>
 
-
                 <div className="flex items-center">
                     <input
                         id="is_public"
@@ -168,7 +192,6 @@ export default function ExerciseForm({ exercise, onSuccess, onClose }) {
                         Make this exercise public (visible to all users)
                     </label>
                 </div>
-
 
                 {err && <p className="text-red-600 text-center text-sm py-2 bg-red-50 rounded-md">{err}</p>}
 

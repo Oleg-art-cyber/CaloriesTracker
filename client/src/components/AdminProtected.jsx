@@ -3,36 +3,36 @@ import { useContext } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
+/**
+ * AdminProtected
+ * Restricts access to child components unless the user has an 'admin' role.
+ * Redirects to login if not authenticated, or to home if not an admin.
+ */
 export default function AdminProtected({ children }) {
     const { token } = useContext(AuthContext);
     const location = useLocation();
 
+    // Redirect to login if no token is found
     if (!token) {
-        // Redirect them to the /login page, but save the current location they were
-        // trying to go to so we can send them along after они login.
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    // Decode token to check role (simple client-side check)
-    // In a real-world scenario, critical admin actions should always be re-verified on the backend.
-    let userRole = 'user'; // Default to 'user' if role is not in token or token is malformed
+    // Attempt to decode token and extract user role
+    let userRole = 'user'; // Default role
     try {
-        if (token) {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            userRole = payload.role || 'user';
-        }
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        userRole = payload.role || 'user';
     } catch (e) {
-        console.error("Error decoding token for admin check:", e);
-        // Potentially logout user if token is malformed
-        // logout();
-        // return <Navigate to="/login" state={{ from: location }} replace />;
+        console.error("AdminProtected: Failed to decode token.", e);
+        return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
+    // Redirect to homepage if user is not an admin
     if (userRole !== 'admin') {
-        // Redirect them to the home page if they are not an admin
-        console.warn("AdminProtected: Access denied. User role is not 'admin'.");
+        console.warn("AdminProtected: Access denied. User is not an admin.");
         return <Navigate to="/" replace />;
     }
 
+    // Render protected content
     return children;
 }

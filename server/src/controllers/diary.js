@@ -1,9 +1,18 @@
-// server/controllers/diary.js
+/**
+ * Diary Controller
+ * Handles all diary-related operations including meal tracking, nutrition calculations,
+ * and physical activity logging
+ */
 const dbSingleton = require('../config/dbSingleton');
 const conn = dbSingleton.getConnection();
 const { checkAndAwardAchievements } = require('./achievements'); // Import achievement checker
 
-// --- SQL HELPER FOR FETCHING RECIPE DETAILS AND CALCULATING NUTRITION ---
+/**
+ * Retrieves detailed recipe information including nutritional values
+ * @param {Array<number>} recipeIds - Array of recipe IDs to fetch
+ * @param {Function} callback - Callback function(err, recipesData)
+ * @returns {Object} Object containing recipe details with calculated nutrition values
+ */
 const getRecipeDetailsWithNutrition = (recipeIds, callback) => {
     if (!recipeIds || recipeIds.length === 0) {
         return callback(null, {});
@@ -52,11 +61,21 @@ const getRecipeDetailsWithNutrition = (recipeIds, callback) => {
     });
 };
 
-// --- Main processing function for getDay to avoid deep nesting ---
+/**
+ * Processes diary data and sends formatted response
+ * @param {number} userId - User ID
+ * @param {string} date - Date in YYYY-MM-DD format
+ * @param {Array} mealItemRows - Raw meal items from database
+ * @param {Array} loggedActivities - Physical activities for the day
+ * @param {Object} recipesFullDetails - Detailed recipe information
+ * @param {Object} res - Express response object
+ * @param {Object} req - Express request object
+ */
 function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, recipesFullDetails, res, req) {
     const mealsOutput = {};
     let summaryKcalConsumed = 0, summaryProtein = 0, summaryFat = 0, summaryCarbs = 0;
 
+    // Process each meal item and calculate nutrition totals
     (mealItemRows || []).forEach(row => {
         if (!row.meal_id) return;
         if (!mealsOutput[row.meal_type]) {
@@ -67,6 +86,7 @@ function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, r
         let itemKcal = 0, itemProtein = 0, itemFat = 0, itemCarbs = 0;
         const processedItem = { meal_product_id: row.meal_product_id, name: 'Unknown Item', type: '' };
 
+        // Process product-based items
         if (row.product_id) {
             processedItem.type = 'product';
             processedItem.product_id = row.product_id;
@@ -77,7 +97,9 @@ function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, r
             itemProtein = (parseFloat(row.product_protein_per_100g) || 0) * factor;
             itemFat     = (parseFloat(row.product_fat_per_100g) || 0) * factor;
             itemCarbs   = (parseFloat(row.product_carbs_per_100g) || 0) * factor;
-        } else if (row.recipe_id && recipesFullDetails && recipesFullDetails[row.recipe_id]) {
+        } 
+        // Process recipe-based items
+        else if (row.recipe_id && recipesFullDetails && recipesFullDetails[row.recipe_id]) {
             processedItem.type = 'recipe';
             processedItem.recipe_id = row.recipe_id;
             const recipeNutriData = recipesFullDetails[row.recipe_id];
@@ -92,20 +114,24 @@ function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, r
             }
         } else { return; }
 
+        // Round nutrition values and add to processed item
         processedItem.kcal = Math.round(itemKcal);
         processedItem.protein = parseFloat(itemProtein.toFixed(1));
         processedItem.fat = parseFloat(itemFat.toFixed(1));
         processedItem.carbs = parseFloat(itemCarbs.toFixed(1));
         mealsOutput[row.meal_type].items.push(processedItem);
 
+        // Update summary totals
         summaryKcalConsumed += itemKcal;
         summaryProtein += itemProtein;
         summaryFat     += itemFat;
         summaryCarbs   += itemCarbs;
     });
 
+    // Calculate total calories burned from exercise
     const totalKcalBurnedExercise = (loggedActivities || []).reduce((sum, activity) => sum + (parseFloat(activity.calories_burned) || 0), 0);
 
+    // Prepare final summary
     const finalSummary = {
         kcal_consumed: Math.round(summaryKcalConsumed),
         protein: parseFloat(summaryProtein.toFixed(1)),
@@ -115,6 +141,7 @@ function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, r
         net_kcal: Math.round(summaryKcalConsumed - totalKcalBurnedExercise)
     };
 
+    // Ensure all meal types are present in output
     const allMealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
     allMealTypes.forEach(mt => {
         if (!mealsOutput[mt]) {
@@ -127,24 +154,32 @@ function processAndRespondGetDay(userId, date, mealItemRows, loggedActivities, r
         }
     });
 
+    // Send response
     res.json({ meals: mealsOutput, summary: finalSummary, activities: loggedActivities || [] });
 
-    // Asynchronously check for achievements after sending response
+    // Check for achievements asynchronously
     checkAndAwardAchievements(userId, {
         type: 'DIARY_LOADED',
         data: { date: date, summary: finalSummary, meals: mealsOutput, activities: loggedActivities }
     }).catch(achErr => console.error("[DiaryCtrl] Error during achievement check after diary load:", achErr));
 }
 
-// --- GET /api/diary?date=YYYY-MM-DD ---
+/**
+ * Retrieves diary entries for a specific date
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing meals, summary, and activities
+ */
 exports.getDay = (req, res) => {
     const userId = req.user.id;
     const date = req.query.date;
 
+    // Validate date format
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         return res.status(400).json({ error: 'Valid date query parameter (YYYY-MM-DD) is required.' });
     }
 
+    // SQL queries for fetching meal items and physical activities
     const sqlMealItems = `
         SELECT
             m.id AS meal_id, m.meal_type, m.meal_datetime,
@@ -171,23 +206,27 @@ exports.getDay = (req, res) => {
         ORDER BY pa.id;
     `;
 
+    // Fetch meal items
     conn.query(sqlMealItems, [userId, date], (errMealItems, mealItemRows) => {
         if (errMealItems) {
-            console.error('getDay - SQL Error (fetch meal items):', errMealItems.code, errMealItems.sqlMessage, errMealItems); // Keep detailed log
+            console.error('getDay - SQL Error (fetch meal items):', errMealItems.code, errMealItems.sqlMessage, errMealItems);
             return res.status(500).json({ error: 'Failed to fetch diary meal entries', details: errMealItems.code });
         }
 
+        // Fetch physical activities
         conn.query(sqlPhysicalActivities, [userId, date], (errActivities, loggedActivities) => {
             if (errActivities) {
-                console.error('getDay - SQL Error (fetch activities):', errActivities.code, errActivities.sqlMessage, errActivities); // Keep detailed log
+                console.error('getDay - SQL Error (fetch activities):', errActivities.code, errActivities.sqlMessage, errActivities);
                 return res.status(500).json({ error: 'Failed to fetch logged activities', details: errActivities.code });
             }
 
+            // Get unique recipe IDs from meal items
             const recipeIdsInDiary = [...new Set((mealItemRows || []).filter(r => r.recipe_id).map(r => r.recipe_id))];
 
+            // Fetch recipe details if needed
             if (recipeIdsInDiary.length > 0) {
                 getRecipeDetailsWithNutrition(recipeIdsInDiary, (recipeErr, recipesFullDetails) => {
-                    if (recipeErr) { // Error already logged in helper
+                    if (recipeErr) {
                         return res.status(500).json({ error: 'Failed to fetch detailed recipe information for diary', details: recipeErr.code || recipeErr.message });
                     }
                     processAndRespondGetDay(userId, date, mealItemRows || [], loggedActivities || [], recipesFullDetails, res, req);
@@ -199,12 +238,18 @@ exports.getDay = (req, res) => {
     });
 };
 
-// --- POST /api/diary/:type ---
+/**
+ * Saves a meal entry to the diary
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response indicating success or failure
+ */
 exports.saveMeal = (req, res) => {
     const userId = req.user.id;
     const mealType = req.params.type;
     const { date, items = [] } = req.body;
 
+    // Validate input
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         return res.status(400).json({ error: 'Valid date (YYYY-MM-DD) is required.' });
     }
@@ -212,6 +257,7 @@ exports.saveMeal = (req, res) => {
         return res.status(400).json({ error: 'No items provided to save. "items" array cannot be empty.' });
     }
 
+    // Validate each item
     for (const item of items) {
         const hasProductId = item.productId !== undefined && item.productId !== null;
         const hasAmountGrams = item.amountGrams !== undefined && item.amountGrams !== null;
@@ -237,9 +283,10 @@ exports.saveMeal = (req, res) => {
         VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id);`;
 
+    // Create or update meal entry
     conn.query(upsertMealQuery, [userId, mealDateTime, mealType], (err, mealResult) => {
         if (err) {
-            console.error('saveMeal - SQL Error (upsert meal):', err.code, err.sqlMessage, err); // Keep detailed log
+            console.error('saveMeal - SQL Error (upsert meal):', err.code, err.sqlMessage, err);
             return res.status(500).json({ error: 'Failed to process meal entry', details: err.code });
         }
 

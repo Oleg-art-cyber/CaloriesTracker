@@ -2,8 +2,12 @@
 import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
-import ExerciseForm from '../components/ExerciseForm'; // Будет создан ниже
+import ExerciseForm from '../components/ExerciseForm';
 
+/**
+ * Exercises component for managing exercise definitions
+ * Allows users to view, add, edit, and delete exercises
+ */
 export default function Exercises() {
     const { token } = useContext(AuthContext);
     const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
@@ -16,8 +20,11 @@ export default function Exercises() {
     const [list,    setList]    = useState([]);
     const [error,   setError]   = useState(null);
     const [adding,  setAdding]  = useState(false);
-    const [editing, setEditing] = useState(null); // Хранит объект упражнения для редактирования
+    const [editing, setEditing] = useState(null); // Stores the exercise object for editing
 
+    /**
+     * Fetches the list of exercises from the server
+     */
     const fetchExercises = async () => {
         try {
             const { data } = await axios.get('/api/exercises', {
@@ -36,13 +43,17 @@ export default function Exercises() {
         if (token) fetchExercises();
     }, [token]);
 
+    /**
+     * Handles the deletion of an exercise
+     * @param {number} id - ID of the exercise to delete
+     */
     const handleDelete = async (id) => {
         if (!confirm('Delete exercise definition? This action cannot be undone.')) return;
         try {
             await axios.delete(`/api/exercises/${id}`, {
                 headers: authHeader
             });
-            fetchExercises(); // Обновить список после удаления
+            fetchExercises(); // Refresh the list after deletion
         } catch (e) {
             console.error(e);
             alert(e.response?.data?.error || 'Delete error');

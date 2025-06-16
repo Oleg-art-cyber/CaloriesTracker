@@ -1,6 +1,6 @@
 // client/src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, AuthContext } from './context/AuthContext'; // AuthContext не используется здесь напрямую, можно убрать если не нужен для других целей в этом файле
+import { AuthProvider, AuthContext } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Products from './pages/Products';
@@ -13,8 +13,9 @@ import Footer from './components/Footer';
 import AchievementsPage from './pages/AchievementsPage.jsx';
 import StatisticsPage from './pages/StatisticsPage.jsx';
 import AdminStatisticsPage from './pages/AdminStatisticsPage.jsx';
-import AdminProtected from './components/AdminProtected.jsx'; // HOC for admin routes
-import { useContext } from 'react'; // useContext не используется здесь напрямую, можно убрать если не нужен для других целей в этом файле
+import AdminProtected from './components/AdminProtected.jsx';
+import { useContext } from 'react';
+
 
 export default function App() {
     return (
@@ -62,12 +63,12 @@ export default function App() {
 
 // General protected route component
 function Protected({ children }) {
-    const { token } = useContext(AuthContext); // AuthContext используется здесь
+    const { token } = useContext(AuthContext);
     return token ? children : <Navigate to="/login" replace />;
 }
 
 // Fallback navigation component
 function NavigateToAppropriate() {
-    const { token } = useContext(AuthContext); // AuthContext используется здесь
+    const { token } = useContext(AuthContext);
     return token ? <Navigate to="/diary" replace /> : <Navigate to="/login" replace />;
 }

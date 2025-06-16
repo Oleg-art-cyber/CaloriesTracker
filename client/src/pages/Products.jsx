@@ -8,24 +8,28 @@ import useCategories from '../hooks/useCategories';
 import useDebounce from '../hooks/useDebounce';
 import Pagination from '../components/Pagination';
 
+/**
+ * Products page component for managing food products
+ * Displays a list of products with search, pagination, and CRUD operations
+ */
 export default function Products() {
     const { token } = useContext(AuthContext);
     const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
 
-    /* JWT payload */
+    // Extract user role and ID from JWT token
     const payload  = token ? JSON.parse(atob(token.split('.')[1])) : {};
     const isAdmin  = payload.role === 'admin';
     const userId   = payload.id;
 
-    /* categories */
+    // Get categories for product classification
     const { cats } = useCategories();
     const catName = id => cats.find(c => c.id === id)?.name;
 
-    /* list + UI state */
+    // State for product list and error handling
     const [list,  setList ] = useState([]);
     const [error, setError] = useState(null);
 
-    /* search + pagination */
+    // Search and pagination state
     const [q,    setQ   ] = useState('');
     const debQ = useDebounce(q, 400);
 
@@ -33,11 +37,14 @@ export default function Products() {
     const limit = 10;
     const [total, setTotal] = useState(0);
 
-    /* modal flags */
+    // Modal state for adding and editing products
     const [adding,  setAdding ] = useState(false);
     const [editing, setEditing] = useState(null);
 
-    /* fetch slice */
+    /**
+     * Fetches a paginated list of products from the server
+     * @param {number} p - Page number to fetch
+     */
     const fetchProducts = async (p = page) => {
         try {
             const { data } = await axios.get('/api/products', {
@@ -55,17 +62,20 @@ export default function Products() {
         }
     };
 
-    /* initial load + on debounced search */
+    // Fetch products on initial load and when search query changes
     useEffect(() => {
-        if (token) fetchProducts(1);   // reset to first page on new search
+        if (token) fetchProducts(1);   // Reset to first page on new search
     }, [token, debQ]);
 
-    /* delete handler */
+    /**
+     * Handles product deletion with confirmation
+     * @param {number} id - ID of the product to delete
+     */
     const handleDelete = async id => {
         if (!confirm('Delete product?')) return;
         try {
             await axios.delete(`/api/products/${id}`, { headers: authHeader });
-            fetchProducts();             // reload current page
+            fetchProducts();             // Reload current page
         } catch (e) {
             console.error(e);
             alert(e.response?.data?.error || 'Delete error');

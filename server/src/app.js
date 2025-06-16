@@ -1,13 +1,16 @@
-// app.js
+/**
+ * Main application entry point for the Calories Tracker API server
+ * Sets up Express application with middleware and routes
+ */
 const express = require('express');
 const cors    = require('cors');
 
-// Routers
+// Import route handlers
 const authRouter = require('./routes/auth');
 const categoryRoutes = require('./routes/categories');
 const productRoutes = require('./routes/products');
 const diaryRoutes = require('./routes/diary');
-const exerciseRoutes = require('./routes/exercise'); // or './routes/exercises'
+const exerciseRoutes = require('./routes/exercise');
 const recipeRoutes = require('./routes/recipes');
 const physicalActivityRoutes = require('./routes/physicalActivity');
 const profileRoutes = require('./routes/profile');
@@ -16,14 +19,15 @@ const statisticsRoutes = require('./routes/statistics');
 const adminStatisticsRoutes = require('./routes/adminStatistics');
 const adminUserRoutes = require('./routes/adminUsers');
 
+// Initialize Express application
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
-// Middlewares
-app.use(cors());
-app.use(express.json());
+// Configure middleware
+app.use(cors()); // Enable Cross-Origin Resource Sharing
+app.use(express.json()); // Parse JSON request bodies
 
-// API Routes
+// Register API routes
 app.use('/api/auth', authRouter);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
@@ -37,13 +41,14 @@ app.use('/api/statistics', statisticsRoutes);
 app.use('/api/admin', adminStatisticsRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 
-// Root route
+// Health check endpoint
 app.get('/', (_req, res) => res.json({ message: 'Server is operational.' }));
 
-// Basic error handling
+// Global error handling middleware
 app.use((err, req, res, next) => {
     console.error("Unhandled application error:", err.stack);
     res.status(500).json({ error: 'Internal Server Error.' });
 });
 
+// Start the server
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

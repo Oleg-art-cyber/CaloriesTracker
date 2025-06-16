@@ -1,22 +1,37 @@
-// server/controllers/exercise.js
-const dbSingleton = require('../config/dbSingleton'); // Adjust path as per your structure
+/**
+ * Exercise Controller
+ * Manages exercise definitions and their metadata.
+ * Handles CRUD operations for exercises, including MET values and calorie calculations.
+ */
+const dbSingleton = require('../config/dbSingleton');
 const conn = dbSingleton.getConnection();
 
-// --- GET /api/exercises ---
-// Fetches all public exercises and exercises created by the currently authenticated user.
+/**
+ * Retrieves all exercises available to the user
+ * Returns both public exercises and those created by the user
+ * @param {Object} req - Express request object containing user ID
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing array of exercises
+ * 
+ * Response includes:
+ * - Exercise details (ID, name, description)
+ * - Calorie calculation data (MET value, calories per minute)
+ * - Metadata (creator, public status, timestamps)
+ */
 exports.getAllExercises = (req, res) => {
     console.log('--- [exerciseController.getAllExercises] ---');
     console.log('req.user from authMiddleware:', req.user); // CHECK THIS!
 
-    // Ensure req.user and req.user.id exist
+    // Validate user authentication
     if (!req.user || typeof req.user.id === 'undefined') {
         console.error('[exerciseController.getAllExercises] User ID not found in req.user. req.user:', req.user);
         return res.status(500).json({ error: 'User identification failed after authentication.' });
     }
-    const userId = req.user.id; // Or req.user.userId if that's the field name in your JWT payload
+    const userId = req.user.id;
 
     console.log(`[exerciseController.getAllExercises] Attempting to fetch exercises for userId: ${userId}`);
 
+    // Query to fetch exercises
     const query = `
         SELECT id, name, description, met_value, calories_per_minute, created_by, is_public, created_at, updated_at
         FROM ExerciseDefinition
@@ -40,20 +55,32 @@ exports.getAllExercises = (req, res) => {
     });
 };
 
-// --- POST /api/exercises ---
-// Creates a new exercise definition.
+/**
+ * Creates a new exercise definition
+ * Validates input and ensures required fields are provided
+ * @param {Object} req - Express request object containing exercise data
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing created exercise details
+ * 
+ * Request body must include:
+ * - name: Exercise name
+ * - met_value or calories_per_minute: At least one must be provided
+ * - is_public: Boolean indicating if exercise is public
+ * - description: Optional exercise description
+ */
 exports.createExercise = (req, res) => {
     const { name, description, met_value, calories_per_minute, is_public } = req.body;
     const created_by = req.user.id;
 
-    // Input Validation
+    // Validate required fields
     if (!name || typeof name !== 'string' || name.trim() === '') {
         return res.status(400).json({ error: 'Exercise name is required and must be a non-empty string.' });
     }
-    const finalIsPublic = typeof is_public === 'boolean' ? is_public : false; // Default to false
+    const finalIsPublic = typeof is_public === 'boolean' ? is_public : false;
     const numMetValue = (met_value !== undefined && met_value !== null && String(met_value).trim() !== '') ? parseFloat(met_value) : null;
     const numCaloriesPerMinute = (calories_per_minute !== undefined && calories_per_minute !== null && String(calories_per_minute).trim() !== '') ? parseFloat(calories_per_minute) : null;
 
+    // Validate calorie calculation data
     if ((numMetValue === null) && (numCaloriesPerMinute === null)) {
         return res.status(400).json({ error: 'Either MET value or Calories per minute must be provided.' });
     }
@@ -64,6 +91,7 @@ exports.createExercise = (req, res) => {
         return res.status(400).json({ error: 'If provided, Calories per minute must be a positive number.' });
     }
 
+    // Insert new exercise
     const query = `
         INSERT INTO ExerciseDefinition (name, description, met_value, calories_per_minute, created_by, is_public)
         VALUES (?, ?, ?, ?, ?, ?);
@@ -95,8 +123,23 @@ exports.createExercise = (req, res) => {
     });
 };
 
-// --- PUT /api/exercises/:id ---
-// Updates an existing exercise definition.
+/**
+ * Updates an existing exercise definition
+ * Verifies user permissions before allowing updates
+ * @param {Object} req - Express request object containing exercise ID and update data
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing updated exercise details
+ * 
+ * URL parameters:
+ * - id: Exercise ID to update
+ * 
+ * Request body may include:
+ * - name: Updated exercise name
+ * - description: Updated exercise description
+ * - met_value: Updated MET value
+ * - calories_per_minute: Updated calories per minute
+ * - is_public: Updated public status
+ */
 exports.updateExercise = (req, res) => {
     const exerciseId = req.params.id;
     if (isNaN(parseInt(exerciseId))) {
@@ -107,15 +150,15 @@ exports.updateExercise = (req, res) => {
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    // Input Validation
+    // Validate required fields
     if (!name || typeof name !== 'string' || name.trim() === '') {
         return res.status(400).json({ error: 'Exercise name is required.' });
     }
-    const finalIsPublic = typeof is_public === 'boolean' ? is_public : (/* fetch existing or default? For now, error if not bool */ false); // Decide handling
-    if (typeof is_public !== 'boolean' && is_public !== undefined) { // Allow undefined, but not other types
+    if (typeof is_public !== 'boolean' && is_public !== undefined) {
         return res.status(400).json({ error: 'is_public must be a boolean if provided.' });
     }
 
+    // Parse and validate numeric values
     const numMetValue = (met_value !== undefined && met_value !== null && String(met_value).trim() !== '') ? parseFloat(met_value) : null;
     const numCaloriesPerMinute = (calories_per_minute !== undefined && calories_per_minute !== null && String(calories_per_minute).trim() !== '') ? parseFloat(calories_per_minute) : null;
 
@@ -129,7 +172,7 @@ exports.updateExercise = (req, res) => {
         return res.status(400).json({ error: 'If provided, Calories per minute must be a positive number.' });
     }
 
-    // Check if exercise exists and if user has permission
+    // Verify exercise exists and check permissions
     conn.query('SELECT id, created_by, is_public AS current_is_public FROM ExerciseDefinition WHERE id = ?', [exerciseId], (err, existingExercises) => {
         if (err) {
             console.error('Error fetching exercise for update check:', err.code, err.sqlMessage);
@@ -144,8 +187,8 @@ exports.updateExercise = (req, res) => {
             return res.status(403).json({ error: 'Forbidden: You do not have permission to edit this exercise.' });
         }
 
-        const updatedIsPublic = typeof is_public === 'boolean' ? is_public : exercise.current_is_public; // Use existing if not provided
-
+        // Update exercise with new values
+        const updatedIsPublic = typeof is_public === 'boolean' ? is_public : exercise.current_is_public;
         const updateQuery = `
             UPDATE ExerciseDefinition
             SET name = ?, description = ?, met_value = ?, calories_per_minute = ?, is_public = ?
@@ -179,8 +222,16 @@ exports.updateExercise = (req, res) => {
     });
 };
 
-// --- DELETE /api/exercises/:id ---
-// Deletes an exercise definition.
+/**
+ * Deletes an exercise definition
+ * Verifies user permissions before allowing deletion
+ * @param {Object} req - Express request object containing exercise ID
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response with success message
+ * 
+ * URL parameters:
+ * - id: Exercise ID to delete
+ */
 exports.deleteExercise = (req, res) => {
     const exerciseId = req.params.id;
     if (isNaN(parseInt(exerciseId))) {
@@ -189,6 +240,7 @@ exports.deleteExercise = (req, res) => {
     const userId = req.user.id;
     const userRole = req.user.role;
 
+    // Verify exercise exists and check permissions
     conn.query('SELECT id, created_by FROM ExerciseDefinition WHERE id = ?', [exerciseId], (err, existingExercises) => {
         if (err) {
             console.error('Error fetching exercise for delete check:', err.code, err.sqlMessage);
@@ -203,6 +255,7 @@ exports.deleteExercise = (req, res) => {
             return res.status(403).json({ error: 'Forbidden: You do not have permission to delete this exercise.' });
         }
 
+        // Delete the exercise
         conn.query('DELETE FROM ExerciseDefinition WHERE id = ?', [exerciseId], (deleteErr) => {
             if (deleteErr) {
                 console.error('Error deleting exercise:', deleteErr.code, deleteErr.sqlMessage);

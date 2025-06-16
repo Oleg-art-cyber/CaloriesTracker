@@ -1,34 +1,32 @@
 // client/src/components/Navbar.jsx
+// Navbar component: Displays the main navigation bar with links for authenticated users, including admin-only links if the user has the 'admin' role.
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 
+/**
+ * Navbar component for site navigation
+ * Shows links based on authentication and user role (admin)
+ */
 export default function Navbar() {
     const { token, logout } = useContext(AuthContext);
     const navigate = useNavigate();
 
-    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ: Объявляем и инициализируем userRole ---
-    let userRole = null; // Initialize to null or a default non-admin role
-
+    // Extract user role from JWT token if available
+    let userRole = null;
     if (token) {
         try {
-            // Decode the token to get the payload
-            // The payload structure depends on what you put in it when signing the JWT on the server
-            // Common fields are 'id' or 'userId', and 'role'
             const payload = JSON.parse(atob(token.split('.')[1]));
-            userRole = payload.role; // Assign role if token exists and payload has 'role'
+            userRole = payload.role;
         } catch (e) {
             console.error("Navbar: Error decoding token:", e);
-            // If token is malformed or decoding fails, userRole remains null (or its initial value)
-            // Optionally, you could trigger logout here if the token is clearly invalid
-            // logout();
-            // navigate('/login');
             userRole = null;
         }
     }
-    // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
-
+    /**
+     * Handles user logout and redirects to login page
+     */
     const handleLogout = () => {
         logout();
         navigate('/login');
@@ -69,7 +67,7 @@ export default function Navbar() {
                             Profile
                         </NavLink>
 
-                        {/* Admin-only link: Now userRole is defined */}
+                        {/* Admin-only link: visible if userRole is 'admin' */}
                         {userRole === 'admin' && (
                             <NavLink to="/admin/statistics" className={linkClass}>
                                 Admin Stats

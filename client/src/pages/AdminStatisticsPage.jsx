@@ -1,48 +1,90 @@
 // client/src/pages/AdminStatisticsPage.jsx
 import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-// import { useNavigate } from 'react-router-dom'; // useNavigate не нужен, если это модальное окно
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-    faUsers, faUserPlus, faBoxOpen, faUtensils as faRecipe, faDumbbell,
-    faClipboardList, faFire, faChartLine,
-    faAppleAlt, faDrumstickBite, faBacon, faBreadSlice,
-    faUsersCog
+    faUsers, faUserPlus, faBoxOpen, faUtensils as faRecipeIcon, // Renamed to avoid conflict
+    faDumbbell, faClipboardList, faFireAlt, // Using faFireAlt for variety
+    faChartBar, faUsersCog
 } from '@fortawesome/free-solid-svg-icons';
-import AdminUserManagementModal from '../components/AdminUserManagementModal'; // <-- ИМПОРТ МОДАЛЬНОГО ОКНА
+import AdminUserManagementModal from '../components/AdminUserManagementModal'; // Ensure this path is correct
 
-const StatCard = ({ title, value, subValue, icon, iconColor = 'text-indigo-500 dark:text-indigo-400', bgColor = 'bg-white dark:bg-gray-800' }) => (
-    <div className={`${bgColor} p-6 rounded-xl shadow-lg flex items-start space-x-4`}>
-        {icon && (
-            <div className={`flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${iconColor.replace('text-', 'bg-').replace('-500', '-100').replace('-400', '-800')} bg-opacity-50 dark:bg-opacity-30`}>
-                <FontAwesomeIcon icon={icon} className={`h-6 w-6 ${iconColor}`} />
+/**
+ * StatCard component for displaying a statistic with an icon and optional button behavior
+ * @param {string} title - Title of the statistic
+ * @param {string|number} value - Main value to display
+ * @param {string} subValue - Subtext or additional info
+ * @param {object} icon - FontAwesome icon
+ * @param {string} iconColor - Tailwind color class for icon
+ * @param {string} bgColor - Tailwind color class for background
+ * @param {function} onClick - Click handler if card is a button
+ * @param {boolean} isButton - Whether the card is clickable
+ * @param {string} testId - Test id for testing
+ */
+const StatCard = ({ title, value, subValue, icon, iconColor = 'text-indigo-500 dark:text-indigo-400', bgColor = 'bg-white dark:bg-gray-800', onClick, isButton = false, testId = "" }) => {
+    const cardClasses = `${bgColor} p-6 rounded-xl shadow-lg flex items-start space-x-4`;
+    const buttonClasses = isButton ? 'w-full text-left hover:ring-2 hover:ring-offset-2 hover:ring-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all' : '';
+
+    const content = (
+        <>
+            {icon && (
+                <div className={`flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${iconColor.replace('text-', 'bg-').replace('-500', '-100').replace('-400', '-800')} bg-opacity-20 dark:bg-opacity-30`}>
+                    <FontAwesomeIcon icon={icon} className={`h-6 w-6 ${iconColor}`} />
+                </div>
+            )}
+            <div className="min-w-0 flex-1">
+                <h3
+                    className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate"
+                    title={title} // Tooltip for truncated title
+                >
+                    {title}
+                </h3>
+                <p className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">{value}</p>
+                {subValue && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1" title={subValue}>{subValue}</p>}
             </div>
-        )}
-        <div className="min-w-0 flex-1">
-            <h3
-                className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate"
-                title={title}
-            >
-                {title}
-            </h3>
-            <p className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">{value}</p>
-            {subValue && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1" title={subValue}>{subValue}</p>}
-        </div>
-    </div>
-);
+        </>
+    );
 
+    if (isButton && onClick) {
+        return (
+            <button onClick={onClick} className={`${cardClasses} ${buttonClasses}`} data-testid={testId}>
+                {content}
+            </button>
+        );
+    }
+
+    return (
+        <div className={`${cardClasses} ${buttonClasses}`} data-testid={testId}>
+            {content}
+        </div>
+    );
+};
+
+/**
+ * AdminStatisticsPage component for displaying admin-level statistics and user management
+ */
 export default function AdminStatisticsPage() {
     const { token } = useContext(AuthContext);
-    // const navigate = useNavigate(); // Не нужен для модального окна
-
+    const navigate = useNavigate();
     const [stats, setStats] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [selectedPeriodDays, setSelectedPeriodDays] = useState(7);
 
-    const [showUserManagementModal, setShowUserManagementModal] = useState(false); // <-- НОВОЕ СОСТОЯНИЕ
+    // Date range state for filtering relevant stats
+    const today = new Date().toISOString().slice(0, 10);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(new Date().getDate() - 6); // Today and previous 6 days = 7 days total
 
+    const [filterStartDate, setFilterStartDate] = useState(sevenDaysAgo.toISOString().slice(0, 10));
+    const [filterEndDate, setFilterEndDate] = useState(today);
+
+    const [showUserManagementModal, setShowUserManagementModal] = useState(false);
+
+    /**
+     * Fetches admin statistics from the server for the selected date range
+     */
     useEffect(() => {
         if (token) {
             setIsLoading(true);
@@ -51,7 +93,11 @@ export default function AdminStatisticsPage() {
 
             axios.get('/api/admin/statistics', {
                 headers: authHeader,
-                params: { period_days: selectedPeriodDays }
+                // Pass date range for stats that are period-dependent
+                params: {
+                    startDate: filterStartDate,
+                    endDate: filterEndDate
+                }
             })
                 .then(response => {
                     setStats(response.data);
@@ -69,155 +115,121 @@ export default function AdminStatisticsPage() {
             setError("Admin access required. Please log in.");
             setStats(null);
         }
-    }, [token, selectedPeriodDays]);
-
-    const handlePeriodChange = (event) => {
-        setSelectedPeriodDays(Number(event.target.value));
-    };
-
-    // Теперь этот обработчик открывает модальное окно
-    const handleManageUsersClick = () => {
-        setShowUserManagementModal(true);
-    };
+    }, [token, filterStartDate, filterEndDate]);
 
     if (isLoading) {
         return <p className="text-center text-gray-500 dark:text-gray-300 p-10">Loading admin statistics...</p>;
     }
-
     if (error) {
         return <p className="text-center text-red-500 bg-red-100 dark:bg-red-800 dark:text-red-200 p-4 rounded-md mx-auto max-w-md">{error}</p>;
     }
-
     if (!stats) {
         return <p className="text-center text-gray-500 dark:text-gray-300 p-10">No statistics data available or failed to load correctly.</p>;
     }
 
     return (
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-10">
-                <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-white text-center sm:text-left mb-4 sm:mb-0">
-                    Admin Dashboard
-                </h1>
-                <button
-                    onClick={handleManageUsersClick} // Открывает модальное окно
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition flex items-center space-x-2"
-                >
-                    <FontAwesomeIcon icon={faUsersCog} />
-                    <span>Manage Users</span>
-                </button>
+            {/* Date Range Picker for relevant stats */}
+            <div className="mb-8 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-6">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Statistics for Period:</span>
+                <div className="flex items-center gap-2">
+                    <label htmlFor="startDateAdmin" className="text-xs text-gray-600 dark:text-gray-300">From:</label>
+                    <input
+                        type="date"
+                        id="startDateAdmin"
+                        name="startDateAdmin"
+                        value={filterStartDate}
+                        onChange={(e) => setFilterStartDate(e.target.value)}
+                        className="p-2 border border-gray-300 rounded-md shadow-sm text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                    />
+                </div>
+                <div className="flex items-center gap-2">
+                    <label htmlFor="endDateAdmin" className="text-xs text-gray-600 dark:text-gray-300">To:</label>
+                    <input
+                        type="date"
+                        id="endDateAdmin"
+                        name="endDateAdmin"
+                        value={filterEndDate}
+                        max={today}
+                        onChange={(e) => setFilterEndDate(e.target.value)}
+                        className="p-2 border border-gray-300 rounded-md shadow-sm text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                    />
+                </div>
             </div>
 
-            {/* User Statistics Section */}
+            {/* Content Overview Section (Now First) */}
             <section className="mb-12">
-                <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-6">User Stats</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <StatCard title="Total Registered Users" value={stats.users?.total || 0} icon={faUsers} />
-                    <StatCard title="New Users (Last 7 Days)" value={stats.users?.newLast7Days || 0} icon={faUserPlus} iconColor="text-green-500 dark:text-green-400" />
-                    <StatCard title="New Users (Last 30 Days)" value={stats.users?.newLast30Days || 0} icon={faUserPlus} iconColor="text-green-500 dark:text-green-400" />
-                </div>
-            </section>
-
-            {/* Content Statistics Section */}
-            <section className="mb-12">
-                <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-6">Content Overview</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-6">Content Overview <span className="text-sm font-normal text-gray-500 dark:text-gray-400">(Total Counts)</span></h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     <StatCard
                         title="Total Products"
                         value={stats.content?.products?.total || 0}
                         subValue={`Public: ${stats.content?.products?.public_count || 0}, Private: ${stats.content?.products?.private_count || 0}`}
                         icon={faBoxOpen}
+                        onClick={() => navigate('/products')}
+                        isButton={true}
                     />
                     <StatCard
                         title="Total Recipes"
                         value={stats.content?.recipes?.total || 0}
                         subValue={`Public: ${stats.content?.recipes?.public_count || 0}, Private: ${stats.content?.recipes?.private_count || 0}`}
-                        icon={faRecipe}
+                        icon={faRecipeIcon}
+                        onClick={() => navigate('/my-recipes')}
+                        isButton={true}
                     />
                     <StatCard
                         title="Total Exercise Definitions"
                         value={stats.content?.exerciseDefinitions?.total || 0}
                         subValue={`Public: ${stats.content?.exerciseDefinitions?.public_count || 0}, Private: ${stats.content?.exerciseDefinitions?.private_count || 0}`}
                         icon={faDumbbell}
+                        onClick={() => navigate('/exercises')}
+                        isButton={true}
                     />
                 </div>
             </section>
 
-            {/* User Activity Section */}
+            {/* User Statistics Section */}
             <section className="mb-12">
-                <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-6">User Engagement</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <StatCard title="Users Logged Food Today" value={stats.activity?.usersLoggedFoodToday || 0} icon={faClipboardList} />
-                    <StatCard title="Users Logged Activity Today" value={stats.activity?.usersLoggedActivityToday || 0} icon={faFire} />
-                    <StatCard title="Meal Items Logged (Last 7 Days)" value={stats.activity?.mealProductsLast7Days || 0} icon={faChartLine} />
-                    <StatCard title="Activities Logged (Last 7 Days)" value={stats.activity?.physicalActivitiesLast7Days || 0} icon={faChartLine} iconColor="text-teal-500 dark:text-teal-400"/>
+                <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-6">
+                    User Stats
+                    {stats.period && <span className="text-sm font-normal text-gray-500 dark:text-gray-400"> (New users in period: {stats.period.startDate} to {stats.period.endDate})</span>}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <StatCard
+                        title="Total Registered Users"
+                        value={stats.users?.total || 0}
+                        icon={faUsers}
+                        onClick={() => setShowUserManagementModal(true)} // Opens modal
+                        isButton={true}
+                        testId="manage-users-button"
+                    />
+                    <StatCard title={`New Users (Selected Period)`} value={stats.users?.newInPeriod || 0} icon={faUserPlus} iconColor="text-green-500 dark:text-green-400" />
+                    {/* Static "New Users (Last 7/30 Days)" can be removed if period selector covers this */}
                 </div>
             </section>
 
-            {/* Platform Average Nutrition Section */}
-            {stats.platformAverageNutrition && (
-                <section className="mb-10">
-                    <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
-                        <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-2 sm:mb-0">
-                            Platform Average Nutrition
-                        </h2>
-                        <div className="flex items-center space-x-2">
-                            <label htmlFor="avgNutriPeriodSelect" className="text-sm font-medium text-gray-600 dark:text-gray-300">Period:</label>
-                            <select
-                                id="avgNutriPeriodSelect"
-                                name="avgNutriPeriodSelect"
-                                value={selectedPeriodDays}
-                                onChange={handlePeriodChange}
-                                className="border border-gray-300 rounded-md p-1.5 text-sm shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                            >
-                                <option value="7">Last 7 Days</option>
-                                <option value="30">Last 30 Days</option>
-                                <option value="180">Last 180 Days</option>
-                                <option value="365">Last 365 Days</option>
-                            </select>
-                        </div>
-                    </div>
+            {/* User Activity Section */}
+            <section className="mb-10">
+                <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-6">
+                    User Engagement
+                    {stats.period && <span className="text-sm font-normal text-gray-500 dark:text-gray-400"> (Period: {stats.period.startDate} to {stats.period.endDate})</span>}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <StatCard title="Unique Users Logged Food" value={stats.activity?.usersLoggedFoodInPeriod || 0} subValue="in selected period" icon={faClipboardList}/>
+                    <StatCard title="Unique Users Logged Activity" value={stats.activity?.usersLoggedActivityInPeriod || 0} subValue="in selected period" icon={faFireAlt}/>
+                    <StatCard title="Total Meal Items Logged" value={stats.activity?.mealProductsInPeriod || 0} subValue="in selected period" icon={faChartBar}/>
+                    <StatCard title="Total Activities Logged" value={stats.activity?.physicalActivitiesInPeriod || 0} subValue="in selected period" icon={faChartBar} iconColor="text-teal-500 dark:text-teal-400"/>
+                </div>
+            </section>
 
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                        Averages based on {stats.platformAverageNutrition.numberOfUserDaysLogged || 0} user-days with logged food data for the selected period.
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <StatCard
-                            title="Avg. Daily KCal Consumed"
-                            value={stats.platformAverageNutrition.avgDailyKcalConsumed || 0}
-                            subValue="kcal / user-day"
-                            icon={faAppleAlt}
-                            iconColor="text-red-500 dark:text-red-400"
-                        />
-                        <StatCard
-                            title="Avg. Daily Protein"
-                            value={stats.platformAverageNutrition.avgDailyProteinGrams || 0}
-                            subValue="grams / user-day"
-                            icon={faDrumstickBite}
-                            iconColor="text-sky-500 dark:text-sky-400"
-                        />
-                        <StatCard
-                            title="Avg. Daily Fat"
-                            value={stats.platformAverageNutrition.avgDailyFatGrams || 0}
-                            subValue="grams / user-day"
-                            icon={faBacon}
-                            iconColor="text-amber-500 dark:text-amber-400"
-                        />
-                        <StatCard
-                            title="Avg. Daily Carbs"
-                            value={stats.platformAverageNutrition.avgDailyCarbsGrams || 0}
-                            subValue="grams / user-day"
-                            icon={faBreadSlice}
-                            iconColor="text-orange-500 dark:text-orange-400"
-                        />
-                    </div>
-                </section>
-            )}
+            {/* Platform Average Nutrition Section - REMOVED as per request */}
 
-            {/* Render User Management Modal conditionally */}
+            {/* User Management Modal */}
             {showUserManagementModal && (
                 <AdminUserManagementModal
-                    isOpen={showUserManagementModal} // Pass isOpen prop to control visibility from inside too
+                    isOpen={showUserManagementModal}
                     onClose={() => setShowUserManagementModal(false)}
+                    // Optional: pass a callback to refresh stats if a user is deleted/changed, though not critical for this modal
                 />
             )}
         </div>

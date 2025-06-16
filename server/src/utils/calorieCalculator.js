@@ -1,12 +1,20 @@
 // server/utils/calorieCalculator.js
 
 /**
- * Calculates Basal Metabolic Rate (BMR) using Mifflin-St Jeor formula.
- * @param {number} weightKg - Weight in kilograms.
- * @param {number} heightCm - Height in centimeters.
- * @param {number} ageYears - Age in years.
- * @param {'male'|'female'|'other'|null|undefined} gender - User's gender.
- * @returns {number|null} BMR in kcal/day or null if essential params are invalid or missing.
+ * Calorie Calculator Utility
+ * Provides functions for calculating various metabolic and nutritional metrics
+ * Includes multiple BMR formulas and TDEE calculations
+ */
+
+/**
+ * Calculates Basal Metabolic Rate (BMR) using Mifflin-St Jeor formula
+ * Most accurate for general population, recommended by the Academy of Nutrition and Dietetics
+ * 
+ * @param {number} weightKg - Weight in kilograms
+ * @param {number} heightCm - Height in centimeters
+ * @param {number} ageYears - Age in years
+ * @param {'male'|'female'|'other'|null|undefined} gender - User's gender
+ * @returns {number|null} BMR in kcal/day or null if essential params are invalid
  */
 function calculateMifflinStJeorBMR(weightKg, heightCm, ageYears, gender) {
     const w = parseFloat(weightKg);
@@ -29,12 +37,14 @@ function calculateMifflinStJeorBMR(weightKg, heightCm, ageYears, gender) {
 }
 
 /**
- * Calculates Basal Metabolic Rate (BMR) using Harris-Benedict (revised) formula.
- * @param {number} weightKg
- * @param {number} heightCm
- * @param {number} ageYears
- * @param {'male'|'female'|'other'|null|undefined} gender
- * @returns {number|null} BMR in kcal/day or null if essential params are invalid or missing.
+ * Calculates Basal Metabolic Rate (BMR) using Harris-Benedict (revised) formula
+ * Older formula, still widely used but less accurate than Mifflin-St Jeor
+ * 
+ * @param {number} weightKg - Weight in kilograms
+ * @param {number} heightCm - Height in centimeters
+ * @param {number} ageYears - Age in years
+ * @param {'male'|'female'|'other'|null|undefined} gender - User's gender
+ * @returns {number|null} BMR in kcal/day or null if essential params are invalid
  */
 function calculateHarrisBenedictBMR(weightKg, heightCm, ageYears, gender) {
     const w = parseFloat(weightKg);
@@ -59,17 +69,19 @@ function calculateHarrisBenedictBMR(weightKg, heightCm, ageYears, gender) {
 }
 
 /**
- * Calculates Basal Metabolic Rate (BMR) using Katch-McArdle formula.
- * Requires Lean Body Mass (LBM). bodyFatPercentage is 0-100.
- * @param {number} weightKg
- * @param {number|null|undefined} bodyFatPercentage - Body fat percentage (e.g., 15 for 15%).
- * @returns {number|null} BMR in kcal/day or null if params are invalid or missing.
+ * Calculates Basal Metabolic Rate (BMR) using Katch-McArdle formula
+ * Most accurate when body fat percentage is known
+ * Requires Lean Body Mass calculation
+ * 
+ * @param {number} weightKg - Weight in kilograms
+ * @param {number|null|undefined} bodyFatPercentage - Body fat percentage (0-100)
+ * @returns {number|null} BMR in kcal/day or null if params are invalid
  */
 function calculateKatchMcArdleBMR(weightKg, bodyFatPercentage) {
     const w = parseFloat(weightKg);
     const bfp = parseFloat(bodyFatPercentage);
 
-    if (isNaN(w) || w <= 0 || bodyFatPercentage === null || bodyFatPercentage === undefined || isNaN(bfp) || bfp <= 0 || bfp >= 100) { // bfp must be > 0
+    if (isNaN(w) || w <= 0 || bodyFatPercentage === null || bodyFatPercentage === undefined || isNaN(bfp) || bfp <= 0 || bfp >= 100) {
         // console.warn("Katch-McArdle: Invalid or missing weight or body fat percentage for BMR calculation.");
         return null;
     }
@@ -82,19 +94,25 @@ function calculateKatchMcArdleBMR(weightKg, bodyFatPercentage) {
     return 370 + (21.6 * leanBodyMass);
 }
 
+/**
+ * Activity level multipliers for TDEE calculation
+ * Based on standard activity level classifications
+ */
 const ACTIVITY_MULTIPLIERS = {
-    sedentary: 1.2,
-    light: 1.375,
-    moderate: 1.55,
-    active: 1.725,
-    very_active: 1.9
+    sedentary: 1.2,      // Little or no exercise
+    light: 1.375,        // Light exercise 1-3 days/week
+    moderate: 1.55,      // Moderate exercise 3-5 days/week
+    active: 1.725,       // Hard exercise 6-7 days/week
+    very_active: 1.9     // Very hard exercise & physical job or training twice per day
 };
 
 /**
- * Calculates Total Daily Energy Expenditure (TDEE).
- * @param {number} bmr - Basal Metabolic Rate.
+ * Calculates Total Daily Energy Expenditure (TDEE)
+ * Multiplies BMR by activity level multiplier
+ * 
+ * @param {number} bmr - Basal Metabolic Rate
  * @param {'sedentary'|'light'|'moderate'|'active'|'very_active'|null|undefined} activityLevel
- * @returns {number|null} TDEE in kcal/day or null if BMR is invalid.
+ * @returns {number|null} TDEE in kcal/day or null if BMR is invalid
  */
 function calculateTDEE(bmr, activityLevel) {
     if (bmr === null || bmr <= 0) return null;
@@ -103,14 +121,16 @@ function calculateTDEE(bmr, activityLevel) {
 }
 
 /**
- * Calculates target daily calories based on TDEE and goal, ensuring it doesn't drop below BMR for weight loss.
- * @param {number} tdee - Total Daily Energy Expenditure.
- * @param {number} bmr - Basal Metabolic Rate.
+ * Calculates target daily calories based on TDEE and goal
+ * Ensures safe minimum calorie intake
+ * 
+ * @param {number} tdee - Total Daily Energy Expenditure
+ * @param {number} bmr - Basal Metabolic Rate
  * @param {'lose'|'gain'|'maintain'|null|undefined} goal
- * @param {number} [adjustmentLose=500] - Calories to subtract for weight loss.
- * @param {number} [adjustmentGain=300] - Calories to add for weight gain.
- * @param {number} [minSafeCalories=1200] - Absolute minimum safe calorie intake for most adults.
- * @returns {number|null} Target calories or null if TDEE/BMR is invalid.
+ * @param {number} [adjustmentLose=500] - Calories to subtract for weight loss
+ * @param {number} [adjustmentGain=300] - Calories to add for weight gain
+ * @param {number} [minSafeCalories=1200] - Absolute minimum safe calorie intake
+ * @returns {number|null} Target calories or null if TDEE/BMR is invalid
  */
 function calculateTargetCaloriesFromTDEE(tdee, bmr, goal, adjustmentLose = 500, adjustmentGain = 300, minSafeCalories = 1200) {
     if (tdee === null || tdee <= 0 || bmr === null || bmr <= 0) {
@@ -135,7 +155,21 @@ function calculateTargetCaloriesFromTDEE(tdee, bmr, goal, adjustmentLose = 500, 
 }
 
 /**
- * Orchestrator function to get all calculated calorie details (BMR, TDEE, Target Calories).
+ * Main function to calculate all calorie-related metrics
+ * Orchestrates the calculation process and handles fallbacks
+ * 
+ * @param {Object} profile - User profile containing physical and goal data
+ * @returns {Object} Object containing calculated BMR, TDEE, and target calories
+ * 
+ * Profile object should include:
+ * - weight: Weight in kg
+ * - height: Height in cm
+ * - age: Age in years
+ * - gender: 'male', 'female', or 'other'
+ * - activity_level: Activity level key
+ * - bmr_formula: Preferred BMR formula
+ * - body_fat_percentage: Body fat percentage (for Katch-McArdle)
+ * - goal: Weight management goal
  */
 function getCalculatedCalorieDetails(profile) {
     if (!profile) {
@@ -148,7 +182,7 @@ function getCalculatedCalorieDetails(profile) {
         activity_level, bmr_formula, body_fat_percentage, goal
     } = profile;
 
-    // Ensure essential data for BMR calculation is present and valid
+    // Validate essential data
     const w = parseFloat(weight);
     const h = parseFloat(height);
     const a = parseInt(age);
@@ -158,6 +192,7 @@ function getCalculatedCalorieDetails(profile) {
         return { bmr: null, tdee: null, targetCalories: null };
     }
 
+    // Calculate BMR using selected formula with fallbacks
     if (bmr_formula === 'katch_mcardle') {
         const bfp = parseFloat(body_fat_percentage);
         // Katch-McArdle requires a valid, positive body_fat_percentage
@@ -184,6 +219,7 @@ function getCalculatedCalorieDetails(profile) {
         return { bmr: null, tdee: null, targetCalories: null };
     }
 
+    // Calculate TDEE and target calories
     const tdee = calculateTDEE(bmr, activity_level);
     if (tdee === null || tdee <= 0) {
         // console.warn("getCalculatedCalorieDetails: TDEE calculation resulted in null or non-positive value.");

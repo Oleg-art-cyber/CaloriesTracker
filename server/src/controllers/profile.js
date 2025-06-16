@@ -4,9 +4,23 @@ const conn = dbSingleton.getConnection();
 const { getCalculatedCalorieDetails } = require('../utils/calorieCalculator');
 
 /**
- * @route   GET /api/profile
- * @desc    Fetches the complete profile for the currently authenticated user.
- * @access  Private
+ * Profile Controller
+ * Handles user profile management including retrieval, updates, and weight tracking.
+ * Manages user data such as personal information, physical attributes, and nutritional goals.
+ */
+
+/**
+ * Retrieves the complete profile for the currently authenticated user
+ * @param {Object} req - Express request object containing user ID
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing user profile data
+ * 
+ * Response includes:
+ * - Personal information (name, email)
+ * - Physical attributes (weight, height, age, gender)
+ * - Fitness goals and activity level
+ * - Calculated values (BMR, TDEE, target calories)
+ * - Account information (role, creation date)
  */
 exports.getProfile = (req, res) => {
     const userId = req.user.id;
@@ -35,10 +49,24 @@ exports.getProfile = (req, res) => {
 };
 
 /**
- * @route   PUT /api/profile
- * @desc    Updates the profile data for the authenticated user.
- *          This includes recalculating BMR/TDEE and logging weight changes.
- * @access  Private
+ * Updates the profile data for the authenticated user
+ * Includes validation, recalculation of nutritional values, and weight history tracking
+ * @param {Object} req - Express request object containing user ID and update data
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing updated user profile
+ * 
+ * Request body may include:
+ * - name: User's full name
+ * - email: User's email address
+ * - weight: Current weight in kg
+ * - height: Height in cm
+ * - age: Age in years
+ * - goal: Fitness goal (e.g., 'lose', 'maintain', 'gain')
+ * - gender: User's gender
+ * - activity_level: Activity level multiplier
+ * - bmr_formula: Formula used for BMR calculation
+ * - body_fat_percentage: Optional body fat percentage
+ * - target_calories_override: Optional manual calorie target
  */
 exports.updateProfile = (req, res) => {
     const userId = req.user.id;
@@ -47,7 +75,7 @@ exports.updateProfile = (req, res) => {
         bmr_formula, body_fat_percentage, target_calories_override
     } = req.body;
 
-    // --- Input Validation (Existing logic preserved) ---
+    // Input validation for all fields
     if (name !== undefined && (typeof name !== 'string' || name.trim() === '')) {
         return res.status(400).json({ error: 'Name cannot be empty.' });
     }
@@ -63,9 +91,8 @@ exports.updateProfile = (req, res) => {
     if (age !== undefined && age !== null && (isNaN(parseInt(age)) || parseInt(age) <= 0 || parseInt(age) > 120)) {
         return res.status(400).json({ error: 'Age must be a realistic positive integer or null.' });
     }
-    // ... other validations from your original code ...
 
-    // Fetch current user data to merge with updates
+    // Fetch current user data for comparison and merging
     conn.query('SELECT * FROM User WHERE id = ?', [userId], (fetchErr, currentUsers) => {
         if (fetchErr) {
             console.error("updateProfile - SQL Error (fetch current user):", fetchErr);
@@ -76,7 +103,7 @@ exports.updateProfile = (req, res) => {
         }
         const currentUserData = currentUsers[0];
 
-        // Prepare fields to update, only including those present in the request body
+        // Prepare fields to update, only including those present in the request
         const fieldsToUpdate = {};
         if (req.body.hasOwnProperty('name')) fieldsToUpdate.name = name.trim();
         if (req.body.hasOwnProperty('email')) fieldsToUpdate.email = email.trim();
@@ -90,33 +117,31 @@ exports.updateProfile = (req, res) => {
         if (req.body.hasOwnProperty('body_fat_percentage')) fieldsToUpdate.body_fat_percentage = (body_fat_percentage === '' || body_fat_percentage === null || isNaN(parseFloat(body_fat_percentage))) ? null : parseFloat(body_fat_percentage);
         if (req.body.hasOwnProperty('target_calories_override')) fieldsToUpdate.target_calories_override = (target_calories_override === '' || target_calories_override === null || isNaN(parseInt(target_calories_override))) ? null : parseInt(target_calories_override);
 
-        // Recalculate BMR, TDEE, and target calories based on the merged data
+        // Recalculate nutritional values based on updated profile data
         const profileForCalc = { ...currentUserData, ...fieldsToUpdate };
         const calculatedValues = getCalculatedCalorieDetails(profileForCalc);
         fieldsToUpdate.bmr = calculatedValues.bmr;
         fieldsToUpdate.calculated_tdee = calculatedValues.tdee;
         fieldsToUpdate.calculated_target_calories = calculatedValues.targetCalories;
 
-        // ... (Your original logic for checking if there are actual changes) ...
-
         /**
-         * Performs the database update within a transaction to ensure data integrity.
-         * It updates the User table and logs the weight if it has changed.
-         * @param {boolean} isEmailConflict - A flag indicating if an email conflict was found.
+         * Performs the database update within a transaction
+         * Updates user profile and logs weight changes if applicable
+         * @param {boolean} isEmailConflict - Indicates if the new email is already in use
          */
         const performActualUpdate = (isEmailConflict) => {
             if (isEmailConflict) {
                 return res.status(409).json({ error: 'Email already in use by another account.' });
             }
 
-            // Start a database transaction to group multiple queries
+            // Begin database transaction
             conn.beginTransaction(transactionErr => {
                 if (transactionErr) {
                     console.error("updateProfile - Transaction Begin Error:", transactionErr);
                     return res.status(500).json({ error: 'Failed to start database transaction.' });
                 }
 
-                // Query 1: Update the User table
+                // Update user profile
                 const updateQuery = 'UPDATE User SET ? WHERE id = ?;';
                 conn.query(updateQuery, [fieldsToUpdate, userId], (updateErr, result) => {
                     if (updateErr) {
@@ -134,7 +159,7 @@ exports.updateProfile = (req, res) => {
                         });
                     }
 
-                    // Query 2 (Conditional): Log the new weight if it was provided
+                    // Log weight change if provided
                     const newWeightProvided = req.body.hasOwnProperty('weight') && fieldsToUpdate.weight !== null;
                     if (newWeightProvided) {
                         const logDate = new Date().toISOString().slice(0, 10);
@@ -150,17 +175,16 @@ exports.updateProfile = (req, res) => {
                                     res.status(500).json({ error: 'Failed to log weight history.' });
                                 });
                             }
-                            // If weight logging is successful, commit and send response
                             commitAndRespond();
                         });
                     } else {
-                        // If no new weight was provided, just commit and send response
                         commitAndRespond();
                     }
                 });
 
                 /**
-                 * Commits the transaction and sends the final updated profile to the client.
+                 * Commits the transaction and returns the updated profile
+                 * Handles any commit errors and rolls back if necessary
                  */
                 function commitAndRespond() {
                     conn.commit(commitErr => {
@@ -171,7 +195,7 @@ exports.updateProfile = (req, res) => {
                             });
                         }
 
-                        // Fetch the final, updated user profile to return
+                        // Fetch and return updated profile
                         const selectQuery = `
                             SELECT id, name, email, weight, height, age, goal, gender, activity_level, 
                                    bmr_formula, body_fat_percentage, target_calories_override,
@@ -191,7 +215,7 @@ exports.updateProfile = (req, res) => {
             });
         };
 
-        // Your original logic for checking email conflicts before performing the update
+        // Check for email conflicts before updating
         if (fieldsToUpdate.hasOwnProperty('email') && fieldsToUpdate.email !== currentUserData.email) {
             const checkEmailQuery = 'SELECT id FROM User WHERE email = ? AND id != ?;';
             conn.query(checkEmailQuery, [fieldsToUpdate.email, userId], (emailErr, emailResults) => {

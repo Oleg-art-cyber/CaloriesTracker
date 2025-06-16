@@ -1,14 +1,32 @@
-// server/controllers/physicalActivity.js
-const dbSingleton = require('../config/dbSingleton'); // Adjust path if necessary
+/**
+ * Physical Activity Controller
+ * Handles logging and management of user physical activities and exercise tracking.
+ * Calculates calories burned based on exercise type, duration, and user weight.
+ */
+const dbSingleton = require('../config/dbSingleton');
 const conn = dbSingleton.getConnection();
 
-// --- POST /api/physical-activity ---
-// Logs a new physical activity for the user.
+/**
+ * Logs a new physical activity for the user
+ * Calculates calories burned based on exercise type, duration, and user weight
+ * @param {Object} req - Express request object containing user ID and activity data
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response containing logged activity details
+ * 
+ * Request body must include:
+ * - exercise_definition_id: ID of the exercise type
+ * - duration_minutes: Duration of the activity in minutes
+ * - activity_date: Date of the activity (YYYY-MM-DD)
+ * 
+ * Response includes:
+ * - Activity details (ID, type, duration, calories burned)
+ * - Success message
+ */
 exports.logActivity = (req, res) => {
-    const currentUserId = req.user.id; // User ID from authMiddleware
+    const currentUserId = req.user.id;
     const { exercise_definition_id, duration_minutes, activity_date } = req.body;
 
-    // Validate input
+    // Validate required input fields
     if (!exercise_definition_id || isNaN(parseInt(exercise_definition_id))) {
         return res.status(400).json({ error: 'Valid exercise_definition_id is required.' });
     }
@@ -22,7 +40,7 @@ exports.logActivity = (req, res) => {
     const numExerciseDefId = parseInt(exercise_definition_id, 10);
     const numDuration = parseInt(duration_minutes, 10);
 
-    // Fetch user's weight and exercise details
+    // Fetch user's current weight and exercise details
     const getUserWeightQuery = 'SELECT weight FROM User WHERE id = ?;';
     const getExerciseDetailsQuery = 'SELECT met_value, calories_per_minute, name FROM ExerciseDefinition WHERE id = ?;';
 
@@ -39,7 +57,7 @@ exports.logActivity = (req, res) => {
             return res.status(400).json({ error: 'User weight is invalid. Please update your profile.' });
         }
 
-
+        // Fetch exercise details and calculate calories burned
         conn.query(getExerciseDetailsQuery, [numExerciseDefId], (exErr, exResults) => {
             if (exErr) {
                 console.error("logActivity - SQL Error (fetch exercise details):", exErr.code, exErr.sqlMessage, exErr);
@@ -52,6 +70,7 @@ exports.logActivity = (req, res) => {
             const exercise = exResults[0];
             let caloriesBurned = 0;
 
+            // Calculate calories burned using MET value or calories per minute
             if (exercise.met_value && userWeightKg) {
                 caloriesBurned = (parseFloat(exercise.met_value) || 0) * userWeightKg * (numDuration / 60.0);
             } else if (exercise.calories_per_minute) {
@@ -62,6 +81,7 @@ exports.logActivity = (req, res) => {
             caloriesBurned = Math.round(caloriesBurned);
             const activityTypeFromName = exercise.name || 'Logged Activity';
 
+            // Insert the activity record
             const insertActivityQuery = `
                 INSERT INTO PhysicalActivity (user_id, exercise_definition_id, activity_date, duration_minutes, calories_burned, activity_type)
                 VALUES (?, ?, ?, ?, ?, ?); 
@@ -86,7 +106,16 @@ exports.logActivity = (req, res) => {
     });
 };
 
-// --- DELETE /api/physical-activity/:activityId ---
+/**
+ * Deletes a physical activity record
+ * Verifies ownership before deletion
+ * @param {Object} req - Express request object containing user ID and activity ID
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response with success message
+ * 
+ * URL parameters:
+ * - activityId: ID of the activity to delete
+ */
 exports.deleteActivity = (req, res) => {
     const currentUserId = req.user.id;
     const activityId = parseInt(req.params.activityId, 10);
@@ -95,8 +124,7 @@ exports.deleteActivity = (req, res) => {
         return res.status(400).json({ error: 'Invalid activity ID.' });
     }
 
-    // Check if the activity belongs to the user before deleting
-    // Now directly check user_id in PhysicalActivity table
+    // Verify activity ownership before deletion
     const checkOwnerQuery = 'SELECT user_id FROM PhysicalActivity WHERE id = ?;';
     conn.query(checkOwnerQuery, [activityId], (ownerErr, results) => {
         if (ownerErr) {
@@ -110,6 +138,7 @@ exports.deleteActivity = (req, res) => {
             return res.status(403).json({ error: 'Forbidden: You cannot delete this activity.' });
         }
 
+        // Delete the activity record
         const deleteQuery = 'DELETE FROM PhysicalActivity WHERE id = ?;';
         conn.query(deleteQuery, [activityId], (deleteErr) => {
             if (deleteErr) {

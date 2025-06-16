@@ -4,6 +4,10 @@ import axios from 'axios'
 import { AuthContext } from '../context/AuthContext'
 import { useNavigate, Link } from 'react-router-dom'
 
+/**
+ * Register component for user registration
+ * Allows users to create a new account with personal details
+ */
 export default function Register() {
     const { login } = useContext(AuthContext)
     const navigate = useNavigate()
@@ -21,21 +25,27 @@ export default function Register() {
     const [errors, setErrors] = useState({})
     const [serverError, setServerError] = useState(null)
 
-    // simple client-side validation
+    /**
+     * Validates the registration form
+     * @returns {Object} Object containing validation errors
+     */
     function validate() {
         const errs = {}
         if (!form.name.trim()) errs.name = 'Name is required'
         if (!/\S+@\S+\.\S+/.test(form.email)) errs.email = 'Valid email is required'
         if (form.password.length < 6) errs.password = 'Password must be at least 6 characters'
         if (form.password !== form.confirmPassword) errs.confirmPassword = 'Passwords must match'
-            ['weight','height','age'].forEach(key => {
+        ['weight','height','age'].forEach(key => {
             const v = Number(form[key])
             if (!v || v <= 0) errs[key] = 'Must be a positive number'
         })
         return errs
     }
 
-    // submit handler: register then auto-login
+    /**
+     * Handles form submission for user registration
+     * @param {Event} e - Form submit event
+     */
     async function handleSubmit(e) {
         e.preventDefault()
         setServerError(null)
@@ -66,6 +76,10 @@ export default function Register() {
         }
     }
 
+    /**
+     * Handles changes in form inputs
+     * @param {Event} e - Input change event
+     */
     function handleChange(e) {
         const { name, value } = e.target
         setForm(prev => ({ ...prev, [name]: value }))
