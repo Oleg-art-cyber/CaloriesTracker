@@ -10,6 +10,7 @@ import {
     faChartBar, faUsersCog
 } from '@fortawesome/free-solid-svg-icons';
 import AdminUserManagementModal from '../components/AdminUserManagementModal'; // Ensure this path is correct
+import NewUsersModal from '../components/NewUsersModal'; // Add this import
 
 /**
  * StatCard component for displaying a statistic with an icon and optional button behavior
@@ -81,6 +82,7 @@ export default function AdminStatisticsPage() {
     const [filterEndDate, setFilterEndDate] = useState(today);
 
     const [showUserManagementModal, setShowUserManagementModal] = useState(false);
+    const [showNewUsersModal, setShowNewUsersModal] = useState(false); // Add this state
 
     /**
      * Fetches admin statistics from the server for the selected date range
@@ -199,12 +201,19 @@ export default function AdminStatisticsPage() {
                         title="Total Registered Users"
                         value={stats.users?.total || 0}
                         icon={faUsers}
-                        onClick={() => setShowUserManagementModal(true)} // Opens modal
+                        onClick={() => setShowUserManagementModal(true)}
                         isButton={true}
                         testId="manage-users-button"
                     />
-                    <StatCard title={`New Users (Selected Period)`} value={stats.users?.newInPeriod || 0} icon={faUserPlus} iconColor="text-green-500 dark:text-green-400" />
-                    {/* Static "New Users (Last 7/30 Days)" can be removed if period selector covers this */}
+                    <StatCard 
+                        title={`New Users (Selected Period)`} 
+                        value={stats.users?.newInPeriod || 0} 
+                        icon={faUserPlus} 
+                        iconColor="text-green-500 dark:text-green-400"
+                        onClick={() => setShowNewUsersModal(true)}
+                        isButton={true}
+                        testId="new-users-button"
+                    />
                 </div>
             </section>
 
@@ -229,7 +238,16 @@ export default function AdminStatisticsPage() {
                 <AdminUserManagementModal
                     isOpen={showUserManagementModal}
                     onClose={() => setShowUserManagementModal(false)}
-                    // Optional: pass a callback to refresh stats if a user is deleted/changed, though not critical for this modal
+                />
+            )}
+
+            {/* New Users Modal */}
+            {showNewUsersModal && (
+                <NewUsersModal
+                    isOpen={showNewUsersModal}
+                    onClose={() => setShowNewUsersModal(false)}
+                    startDate={filterStartDate}
+                    endDate={filterEndDate}
                 />
             )}
         </div>

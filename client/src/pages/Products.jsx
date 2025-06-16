@@ -1,6 +1,7 @@
 // client/src/pages/Products.jsx
 import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import Select from 'react-select';
 import { AuthContext } from '../context/AuthContext';
 import ProductForm from '../components/ProductForm';
 import CategoryBadge from '../components/CategoryBadge';
@@ -28,6 +29,8 @@ export default function Products() {
     // State for product list and error handling
     const [list,  setList ] = useState([]);
     const [error, setError] = useState(null);
+    const [users, setUsers] = useState([]);
+    const [selectedUserId, setSelectedUserId] = useState('');
 
     // Search and pagination state
     const [q,    setQ   ] = useState('');
@@ -41,6 +44,23 @@ export default function Products() {
     const [adding,  setAdding ] = useState(false);
     const [editing, setEditing] = useState(null);
 
+    // Fetch users for admin filter
+    useEffect(() => {
+        if (isAdmin && token) {
+            axios.get('/api/users', { headers: authHeader })
+                .then(({ data }) => {
+                    // Transform data for react-select
+                    const options = data.map(user => ({
+                        value: user.id,
+                        label: user.name,
+                        email: user.email
+                    }));
+                    setUsers(options);
+                })
+                .catch(console.error);
+        }
+    }, [isAdmin, token]);
+
     /**
      * Fetches a paginated list of products from the server
      * @param {number} p - Page number to fetch
@@ -49,7 +69,12 @@ export default function Products() {
         try {
             const { data } = await axios.get('/api/products', {
                 headers: authHeader,
-                params : { q: debQ, page: p, limit }
+                params : { 
+                    q: debQ, 
+                    page: p, 
+                    limit,
+                    user_id: selectedUserId || undefined
+                }
             });
             setList(data.data);
             setTotal(data.total);
@@ -62,10 +87,10 @@ export default function Products() {
         }
     };
 
-    // Fetch products on initial load and when search query changes
+    // Fetch products on initial load and when search query or user filter changes
     useEffect(() => {
         if (token) fetchProducts(1);   // Reset to first page on new search
-    }, [token, debQ]);
+    }, [token, debQ, selectedUserId]);
 
     /**
      * Handles product deletion with confirmation
@@ -96,14 +121,56 @@ export default function Products() {
                 )}
             </header>
 
-            {/* search */}
-            <input
-                type="text"
-                placeholder="Search..."
-                value={q}
-                onChange={e => setQ(e.target.value)}
-                className="mb-4 w-full max-w-xs border rounded px-3 py-1"
-            />
+            <div className="flex gap-4 mb-4">
+                {/* search */}
+                <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={q}
+                    onChange={e => setQ(e.target.value)}
+                    className="w-full max-w-xs border rounded px-3 py-1"
+                />
+
+                {/* user filter for admin */}
+                {isAdmin && (
+                    <div className="w-64">
+                        <Select
+                            value={users.find(u => u.value === selectedUserId) || null}
+                            onChange={option => setSelectedUserId(option?.value || '')}
+                            options={users}
+                            isClearable
+                            placeholder="Filter by user..."
+                            noOptionsMessage={() => "No users found"}
+                            formatOptionLabel={option => (
+                                <div>
+                                    <div>{option.label}</div>
+                                    <div className="text-xs text-gray-500">{option.email}</div>
+                                </div>
+                            )}
+                            className="react-select-container"
+                            classNamePrefix="react-select"
+                            styles={{
+                                control: (base) => ({
+                                    ...base,
+                                    minHeight: '38px',
+                                    borderColor: '#d1d5db',
+                                    '&:hover': {
+                                        borderColor: '#9ca3af'
+                                    }
+                                }),
+                                option: (base, state) => ({
+                                    ...base,
+                                    backgroundColor: state.isFocused ? '#f3f4f6' : 'white',
+                                    color: '#1f2937',
+                                    '&:active': {
+                                        backgroundColor: '#e5e7eb'
+                                    }
+                                })
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
 
             {error && <p className="text-red-600 mb-4">{error}</p>}
 
@@ -120,6 +187,9 @@ export default function Products() {
                                 <div className="flex items-center gap-3 text-sm text-gray-500">
                                     <span>{p.calories} kcal</span>
                                     <CategoryBadge name={catName(p.category_id)} />
+                                    {isAdmin && p.creator_name && (
+                                        <span className="text-gray-400">Created by: {p.creator_name}</span>
+                                    )}
                                 </div>
                             </div>
 

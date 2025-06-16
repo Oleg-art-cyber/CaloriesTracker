@@ -81,13 +81,14 @@ exports.getAll = (req, res) => {
     const page   = Math.max(+req.query.page  || 1, 1);
     const limit  = Math.max(+req.query.limit || 10, 1);
     const offset = (page - 1) * limit;
+    const filterUserId = req.query.user_id ? Number(req.query.user_id) : null;
 
     const baseWhere = isAdmin
-        ? 'WHERE p.name LIKE ?'
+        ? 'WHERE p.name LIKE ?' + (filterUserId ? ' AND p.created_by = ?' : '')
         : 'WHERE (p.is_public = 1 OR p.created_by = ?) AND p.name LIKE ?';
 
     const whereParams = isAdmin
-        ? [`%${q}%`]
+        ? filterUserId ? [`%${q}%`, filterUserId] : [`%${q}%`]
         : [userId, `%${q}%`];
 
     /* count total */
@@ -98,9 +99,10 @@ exports.getAll = (req, res) => {
 
         /* page slice */
         const dataSQL = `
-      SELECT p.*, c.name AS category
+      SELECT p.*, c.name AS category, u.name AS creator_name
       FROM product p
       LEFT JOIN category c ON c.id = p.category_id
+      LEFT JOIN User u ON u.id = p.created_by
       ${baseWhere}
       ORDER BY p.id DESC
       LIMIT ? OFFSET ?`;
