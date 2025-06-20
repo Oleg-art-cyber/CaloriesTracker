@@ -14,32 +14,91 @@
 |10 | Security (HTTPS, GDPR options) | ⚙︎ ongoing | Sec-4-8 |
 
 ---
+# API Reference (v0.9.0)
 
-API 
-Method	Endpoint	Auth	Note/Description
-POST	/api/auth/register	public	Register new user, returns JWT
-POST	/api/auth/login	public	Login, returns JWT
-GET	/api/categories	public	Get all product categories
-GET	/api/products	user, admin	List all public or owned products
-GET	/api/products/:id	user, admin	Get product by ID
-POST	/api/products	user, admin	Create product (user or admin)
-PUT	/api/products/:id	user, admin	Update product (admin or owner)
-DELETE	/api/products/:id	user, admin	Delete product (admin or owner)
-GET	/api/diary/:type	user, admin	Get diary entries by meal type
-POST	/api/diary/:type	user, admin	Add meal entry
-GET	/api/achievements	user, admin	Get all achievements for user
-GET	/api/profile	user, admin	Get user profile
-PUT	/api/profile	user, admin	Update user profile
-GET	/api/statistics	user, admin	Get user statistics
-GET	/api/exercise/:id	user, admin	Get exercise by ID
-GET	/api/physical-activity	user, admin	Get all physical activities for user
-POST	/api/physical-activity	user, admin	Add physical activity
-GET	/api/recipes	user, admin	Get all recipes for user
-POST	/api/recipes	user, admin	Create new recipe
-PUT	/api/recipes/:id	user, admin	Update recipe
-DELETE	/api/recipes/:id	user, admin	Delete recipe
-GET	/api/users	admin	List all users (admin only)
-GET	/api/admin/statistics	admin	Get admin dashboard statistics
-GET	/api/admin/users	admin	List all users (admin management)
-PUT	/api/admin/users/:id	admin	Update user (admin management)
-DELETE	/api/admin/users/:id	admin	Delete user (admin management)
+> All responses are in JSON format.  
+> `public` — no authentication required.  
+> `user, admin` — requires JWT; user can access their own data, admin can access everything.  
+> `admin` — only accessible by administrators.
+
+---
+
+## 1. Authentication
+
+| Method | Endpoint              | Access | Description                      |
+|--------|-----------------------|--------|----------------------------------|
+| POST   | `/api/auth/register`  | public | Register new user, returns JWT   |
+| POST   | `/api/auth/login`     | public | Login user, returns JWT          |
+
+---
+
+## 2. Categories & Products
+
+| Method | Endpoint                     | Access      | Description                                         |
+|--------|------------------------------|-------------|-----------------------------------------------------|
+| GET    | `/api/categories`            | public      | Get all product categories                          |
+| GET    | `/api/products`              | user, admin | List all public or user-owned products              |
+| GET    | `/api/products/:id`          | user, admin | Get product by ID                                   |
+| POST   | `/api/products`              | user, admin | Create a new product                                |
+| PUT    | `/api/products/:id`          | user, admin | Update a product (owner or admin only)              |
+| DELETE | `/api/products/:id`          | user, admin | Delete a product (owner or admin only)              |
+
+---
+
+## 3. Meal Diary
+
+| Method | Endpoint               | Access      | Description                               |
+|--------|------------------------|-------------|-------------------------------------------|
+| GET    | `/api/diary/:type`     | user, admin | Get meal entries by meal type             |
+| POST   | `/api/diary/:type`     | user, admin | Add a meal entry                          |
+
+---
+
+## 4. Achievements & Profile
+
+| Method | Endpoint              | Access      | Description                      |
+|--------|-----------------------|-------------|----------------------------------|
+| GET    | `/api/achievements`   | user, admin | Get all achievements for user    |
+| GET    | `/api/profile`        | user, admin | Get user profile                 |
+| PUT    | `/api/profile`        | user, admin | Update user profile              |
+
+---
+
+## 5. User Statistics
+
+| Method | Endpoint            | Access      | Description               |
+|--------|---------------------|-------------|----------------------------|
+| GET    | `/api/statistics`   | user, admin | Get user statistics        |
+
+---
+
+## 6. Exercises & Physical Activity
+
+| Method | Endpoint                         | Access      | Description                           |
+|--------|----------------------------------|-------------|----------------------------------------|
+| GET    | `/api/exercise/:id`             | user, admin | Get exercise by ID                     |
+| GET    | `/api/physical-activity`        | user, admin | Get all user physical activities       |
+| POST   | `/api/physical-activity`        | user, admin | Add new physical activity              |
+
+---
+
+## 7. Recipes
+
+| Method | Endpoint              | Access      | Description                  |
+|--------|-----------------------|-------------|------------------------------|
+| GET    | `/api/recipes`        | user, admin | Get all user recipes         |
+| POST   | `/api/recipes`        | user, admin | Create a new recipe          |
+| PUT    | `/api/recipes/:id`    | user, admin | Update a recipe              |
+| DELETE | `/api/recipes/:id`    | user, admin | Delete a recipe              |
+
+---
+
+## 8. Admin Panel
+
+| Method | Endpoint                    | Access | Description                                |
+|--------|-----------------------------|--------|--------------------------------------------|
+| GET    | `/api/users`                | admin  | List all users                              |
+| GET    | `/api/admin/statistics`     | admin  | Get admin dashboard statistics              |
+| GET    | `/api/admin/users`          | admin  | Manage user list (admin panel)              |
+| PUT    | `/api/admin/users/:id`      | admin  | Update user info as admin                   |
+| DELETE | `/api/admin/users/:id`      | admin  | Delete user as admin                        |
