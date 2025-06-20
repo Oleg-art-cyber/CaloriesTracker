@@ -8,7 +8,7 @@
 | 4 | Activity log & calories burned |  ✅  | Req-4 |
 | 5 | Progress stats & charts |  ✅  | 007-UC |
 | 6 | Product catalog CRUD | ✅ | Req-6 / Req-7 |
-| 7 | Admin user management | planned | P5.1 |
+| 7 | Admin user management | ✅ | P5.1 |
 | 8 | Personalised recommendations |  ✅  | P6 |
 | 9 | Achievements & badges |  ✅  | P6.1 |
 |10 | Security (HTTPS, GDPR options) | ⚙︎ ongoing | Sec-4-8 |
