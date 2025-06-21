@@ -1,4 +1,7 @@
 {
+  "name": "calories-tracker-server",
+  "version": "0.9.2",
+  "description": "Backend server for calories tracking application",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"

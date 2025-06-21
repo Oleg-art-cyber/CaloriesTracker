@@ -47,6 +47,12 @@ export default function AddActivityModal({ date, onClose, reloadDiary }) {
         ? allExercises
         : allExercises.filter(ex => ex.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
+    // Helper to convert date string (YYYY-MM-DD) to UTC midnight ISO string
+    function toUtcMidnight(dateStr) {
+        const d = new Date(dateStr + 'T00:00:00Z');
+        return d.toISOString().slice(0, 10); // Always returns YYYY-MM-DD
+    }
+
     /**
      * Handles the submission of a new activity log.
      */
@@ -68,7 +74,7 @@ export default function AddActivityModal({ date, onClose, reloadDiary }) {
         const payload = {
             exercise_definition_id: Number(selectedExerciseId),
             duration_minutes: numDuration,
-            activity_date: date,
+            activity_date: toUtcMidnight(date),
         };
 
         setIsLoading(true);

@@ -1,6 +1,7 @@
 /**
  * Main application entry point for the Calories Tracker API server
  * Sets up Express application with middleware and routes
+ * Oleg Kustov, Gleb Nikolski
  */
 const express = require('express');
 const cors    = require('cors');

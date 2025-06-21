@@ -91,7 +91,7 @@ router.get('/new', async (req, res) => {
         const query = `
             SELECT id, name, email, role, created_at
             FROM User
-            WHERE created_at >= ? AND created_at <= ?
+            WHERE DATE(created_at) >= ? AND DATE(created_at) <= ?
             ORDER BY created_at DESC
         `;
 

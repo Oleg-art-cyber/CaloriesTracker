@@ -103,13 +103,10 @@ export default function StatisticsPage() {
         setIsLoadingWeight(true);
         axios.get('/api/statistics/weight-trend', { params, headers: authHeader })
             .then(response => {
-                console.log('Weight trend raw data:', response.data);
+                // No need to fill missing dates for weight, as backend interpolates
                 const data = response.data;
                 if (Array.isArray(data) && data.length > 0) {
-                    // Sort data by date to ensure correct order
                     const sortedData = [...data].sort((a, b) => new Date(a.date) - new Date(b.date));
-                    console.log('Weight trend sorted data:', sortedData);
-                    
                     const labels = sortedData.map(d => formatDateForDisplay(d.date));
                     setWeightTrendData({
                         labels,
@@ -138,41 +135,60 @@ export default function StatisticsPage() {
         setIsLoadingTrend(true);
         axios.get('/api/statistics/calories-trend', { params, headers: authHeader })
             .then(response => {
+                // Ensure all days in the range are represented, even if no data for some days
                 const data = response.data;
-                if (Array.isArray(data) && data.length > 0) {
-                    const labels = data.map(d => formatDateForDisplay(d.date));
-                    setCalorieTrendData({
-                        labels,
-                        datasets: [
-                            {
-                                label: 'Consumed',
-                                data: data.map(d => d.consumed),
-                                borderColor: 'rgb(255, 99, 132)',
-                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                                tension: 0.1,
-                                fill: 'origin'
-                            },
-                            {
-                                label: 'Burned',
-                                data: data.map(d => d.burned),
-                                borderColor: 'rgb(54, 162, 235)',
-                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                                tension: 0.1,
-                                fill: 'origin'
-                            },
-                            {
-                                label: 'Net',
-                                data: data.map(d => d.consumed - d.burned),
-                                borderColor: 'rgb(75, 192, 192)',
-                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                                tension: 0.1,
-                                fill: false
-                            }
-                        ]
-                    });
-                } else {
-                    setCalorieTrendData(null);
+                const allDates = [];
+                let current = new Date(startDate);
+                const end = new Date(endDate);
+                while (current <= end) {
+                    allDates.push(formatDateForAPI(current));
+                    current.setDate(current.getDate() + 1);
                 }
+                // Log all dates expected on the chart
+                console.log('allDates:', allDates);
+                // Normalize all server dates to YYYY-MM-DD for reliable matching
+                const dataMap = new Map(
+                  Array.isArray(data)
+                    ? data.map(d => [d.date.slice(0, 10), d]) // slice(0, 10) ensures only date part
+                    : []
+                );
+                // Log all keys from server data
+                console.log('dataMap keys:', Array.from(dataMap.keys()));
+                // Log today and endDate for debugging
+                console.log('today:', formatDateForAPI(new Date()));
+                console.log('endDate:', endDate);
+                // Fill missing days with zeros
+                const filledData = allDates.map(date => dataMap.get(date) || { date, consumed: 0, burned: 0 });
+                const labels = filledData.map(d => formatDateForDisplay(d.date));
+                setCalorieTrendData({
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Consumed',
+                            data: filledData.map(d => d.consumed),
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            tension: 0.1,
+                            fill: 'origin'
+                        },
+                        {
+                            label: 'Burned',
+                            data: filledData.map(d => d.burned),
+                            borderColor: 'rgb(54, 162, 235)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            tension: 0.1,
+                            fill: 'origin'
+                        },
+                        {
+                            label: 'Net',
+                            data: filledData.map(d => d.consumed - d.burned),
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            tension: 0.1,
+                            fill: false
+                        }
+                    ]
+                });
             })
             .catch(err => {
                 console.error("Calorie trend error:", err);
@@ -201,6 +217,7 @@ export default function StatisticsPage() {
         setIsLoadingMacros(true);
         axios.get('/api/statistics/macronutrient-distribution', { params, headers: authHeader })
             .then(response => {
+                // Ensure all days in the range are represented for macros as well
                 const data = response.data;
                 if (data && typeof data.protein_pct === 'number') {
                     setMacroDistribution({

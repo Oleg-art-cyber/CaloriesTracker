@@ -1,5 +1,24 @@
 # Changelog
 
+## Version 0.9.2
+
+### Major Changes
+- Updated all package.json files to version 0.9.2
+- Improved version management across client and server
+- Enhanced project structure and documentation
+
+### Frontend Changes
+- Updated client package.json version to 0.9.2
+- Improved version consistency across the application
+
+### Backend Changes
+- Updated server package.json version to 0.9.2
+- Enhanced version tracking in backend services
+
+### Documentation
+- Updated changelog with version 0.9.2 information
+- Improved version management documentation
+
 ## Version 8.1
 
 ### Major Changes

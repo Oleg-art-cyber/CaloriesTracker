@@ -20,7 +20,9 @@ export default function Register() {
         weight: '',
         height: '',
         age: '',
-        goal: 'lose'
+        goal: 'lose',
+        gender: '',
+        activity_level: 'sedentary'
     })
     const [errors, setErrors] = useState({})
     const [serverError, setServerError] = useState(null)
@@ -39,6 +41,8 @@ export default function Register() {
             const v = Number(form[key])
             if (!v || v <= 0) errs[key] = 'Must be a positive number'
         })
+        if (!form.gender) errs.gender = 'Gender is required'
+        if (!form.activity_level) errs.activity_level = 'Activity level is required'
         return errs
     }
 
@@ -63,7 +67,9 @@ export default function Register() {
                 weight: Number(form.weight),
                 height: Number(form.height),
                 age: Number(form.age),
-                goal: form.goal
+                goal: form.goal,
+                gender: form.gender,
+                activity_level: form.activity_level
             })
             // login immediately after registration
             await login(form.email, form.password)
@@ -135,6 +141,7 @@ export default function Register() {
                             onChange={handleChange}
                             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400"
                             placeholder="••••••••"
+                            autoComplete="new-password"
                         />
                         {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
                     </div>
@@ -147,6 +154,7 @@ export default function Register() {
                             onChange={handleChange}
                             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400"
                             placeholder="••••••••"
+                            autoComplete="new-password"
                         />
                         {errors.confirmPassword && <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>}
                     </div>
@@ -183,6 +191,41 @@ export default function Register() {
                         <option value="gain">Gain Weight</option>
                         <option value="maintain">Maintain Weight</option>
                     </select>
+                </div>
+
+                {/* Gender */}
+                <div>
+                    <label className="block mb-1 text-sm font-medium">Gender</label>
+                    <select
+                        name="gender"
+                        value={form.gender}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400"
+                    >
+                        <option value="">Select gender</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                    </select>
+                    {errors.gender && <p className="text-red-500 text-sm mt-1">{errors.gender}</p>}
+                </div>
+
+                {/* Activity Level */}
+                <div>
+                    <label className="block mb-1 text-sm font-medium">Activity Level</label>
+                    <select
+                        name="activity_level"
+                        value={form.activity_level}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400"
+                    >
+                        <option value="sedentary">Sedentary (little or no exercise)</option>
+                        <option value="light">Lightly Active (light exercise/sports 1-3 days/wk)</option>
+                        <option value="moderate">Moderately Active (moderate exercise/sports 3-5 days/wk)</option>
+                        <option value="active">Active (hard exercise/sports 6-7 days/wk)</option>
+                        <option value="very_active">Very Active (very hard exercise & physical job)</option>
+                    </select>
+                    {errors.activity_level && <p className="text-red-500 text-sm mt-1">{errors.activity_level}</p>}
                 </div>
 
                 {serverError && <p className="text-red-600 text-center">{serverError}</p>}

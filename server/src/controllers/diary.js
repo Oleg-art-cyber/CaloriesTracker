@@ -277,7 +277,9 @@ exports.saveMeal = (req, res) => {
         }
     }
 
+    // Store meal_datetime as plain local time string to match MySQL DATETIME expectations
     const mealDateTime = `${date} 00:00:00`;
+
     const upsertMealQuery = `
         INSERT INTO meal (user_id, meal_datetime, meal_type)
         VALUES (?, ?, ?)

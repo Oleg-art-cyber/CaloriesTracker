@@ -128,6 +128,13 @@ export default function AddItemModal({ type, date, close }) {
         setRecipeSearch('');
     };
 
+    // Helper to convert date string (YYYY-MM-DD) to UTC midnight ISO string using Date.UTC for robustness
+    function toUtcMidnight(dateStr) {
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const utcDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+        return utcDate.toISOString().slice(0, 10); // Always returns YYYY-MM-DD
+    }
+
     /**
      * Validates and submits selected item to diary
      * Handles both product and recipe submissions
@@ -173,7 +180,7 @@ export default function AddItemModal({ type, date, close }) {
         try {
             await axios.post(
                 `/api/diary/${type}`,
-                { date, items: [payloadItem] },
+                { date: toUtcMidnight(date), items: [payloadItem] },
                 { headers: authHeader }
             );
             if (close) close();

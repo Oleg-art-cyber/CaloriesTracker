@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const Joi = require('joi');
 const db = require('../config/dbSingleton').getConnection();
+const { getCalculatedCalorieDetails } = require('../utils/calorieCalculator');
 
 /**
  * Validation schema for user registration
@@ -25,7 +26,9 @@ const regSchema = Joi.object({
     weight: Joi.number().positive().required(),
     height: Joi.number().positive().required(),
     age: Joi.number().min(1).required(),
-    goal: Joi.string().valid('lose', 'gain', 'maintain').required()
+    goal: Joi.string().valid('lose', 'gain', 'maintain').required(),
+    gender: Joi.string().valid('male', 'female', 'other').required(),
+    activity_level: Joi.string().valid('sedentary', 'light', 'moderate', 'active', 'very_active').required()
 });
 
 /**
@@ -45,16 +48,31 @@ async function register(req, res) {
     const { error, value } = regSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.message });
 
-    const { name, email, password, weight, height, age, goal } = value;
+    const { name, email, password, weight, height, age, goal, gender, activity_level } = value;
     const hash = await bcrypt.hash(password, 10);
+
+    // Calculate BMR, TDEE, and target calories
+    const calorieDetails = getCalculatedCalorieDetails({
+        weight,
+        height,
+        age,
+        gender,
+        activity_level,
+        goal,
+        bmr_formula: 'mifflin_st_jeor', // default formula for registration
+        body_fat_percentage: null
+    });
+    const bmr = calorieDetails.bmr;
+    const calculated_tdee = calorieDetails.tdee;
+    const calculated_target_calories = calorieDetails.targetCalories;
 
     const sql = `
         INSERT INTO user
-            (name, email, password, weight, height, age, goal)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+            (name, email, password, weight, height, age, goal, gender, activity_level, bmr, calculated_tdee, calculated_target_calories)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    db.query(sql, [name, email, hash, weight, height, age, goal], (err, result) => {
+    db.query(sql, [name, email, hash, weight, height, age, goal, gender, activity_level, bmr, calculated_tdee, calculated_target_calories], (err, result) => {
         if (err && err.code === 'ER_DUP_ENTRY')
             return res.status(409).json({ error: 'Email already exists' });
         if (err)
@@ -70,7 +88,7 @@ async function register(req, res) {
 
         res.status(201).json({
             token,
-            user: { id: userId, name, email, weight, height, age, goal, role: 'user' }
+            user: { id: userId, name, email, weight, height, age, goal, gender, activity_level, bmr, calculated_tdee, calculated_target_calories, role: 'user' }
         });
     });
 }

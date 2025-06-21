@@ -33,19 +33,12 @@ function queryAsync(sql, params) {
  */
 function getDatesInRange(startDateStr, endDateStr) {
     const dates = [];
-    // Create dates using local timezone
-    let currentDate = new Date(startDateStr + 'T00:00:00');
-    const finalEndDate = new Date(endDateStr + 'T23:59:59');
-    
-    if (isNaN(currentDate.getTime()) || isNaN(finalEndDate.getTime())) {
-        console.error("getDatesInRange: Invalid date strings provided", { startDateStr, endDateStr });
-        return [];
-    }
-
-    // Include both start and end dates
+    // Always use UTC to avoid timezone issues
+    let currentDate = new Date(startDateStr + 'T00:00:00Z');
+    const finalEndDate = new Date(endDateStr + 'T00:00:00Z');
     while (currentDate <= finalEndDate) {
         dates.push(currentDate.toISOString().slice(0, 10));
-        currentDate.setDate(currentDate.getDate() + 1);
+        currentDate.setUTCDate(currentDate.getUTCDate() + 1); // Always increment in UTC
     }
     return dates;
 }
@@ -122,7 +115,10 @@ exports.getWeightTrend = async (req, res) => {
         console.log('getWeightTrend - Generated dates:', allDates);
         
         // Create a map of date to weight
-        const weightMap = new Map(weightLogs.map(log => [log.date.toISOString().slice(0, 10), log.weight]));
+        const weightMap = new Map(weightLogs.map(log => [
+            typeof log.date === 'string' ? log.date.slice(0, 10) : log.date.toISOString().slice(0, 10),
+            log.weight
+        ]));
         console.log('getWeightTrend - Weight map:', Object.fromEntries(weightMap));
         
         const trendData = allDates.map(dateStr => {
@@ -164,66 +160,74 @@ exports.getCalorieTrend = async (req, res) => {
         return res.status(400).json({ error: 'Provide both startDate and endDate (YYYY-MM-DD).' });
     }
 
-    const dates = getDatesInRange(startDate, endDate);
-    console.log('getCalorieTrend - Generated dates:', dates);
-
-    const dailyDataResults = [];
+    // Generate all dates in the range (inclusive)
+    const allDates = getDatesInRange(startDate, endDate);
+    console.log('getCalorieTrend - Generated dates:', allDates);
 
     try {
-        for (const date of dates) {
-            console.log('getCalorieTrend - Processing date:', date);
-            
-            // Fetch meal items and activity data for the day, including the entire day
-            const mealItemsQuery = `
-                SELECT mp.product_id, mp.product_amount, mp.recipe_id, mp.servings_consumed, p.calories AS p_cal 
-                FROM meal m 
-                JOIN MealProduct mp ON m.id = mp.meal_id 
-                LEFT JOIN product p ON mp.product_id = p.id AND mp.recipe_id IS NULL 
-                WHERE m.user_id = ? 
-                AND DATE(m.meal_datetime) = ?;
-            `;
-            const activityQuery = `
-                SELECT SUM(calories_burned) as total_burned 
-                FROM PhysicalActivity 
-                WHERE user_id = ? 
-                AND DATE(activity_date) = ?;
-            `;
+        // Use DATE(m.meal_datetime) to match MySQL server's local time zone (IDT)
+        const mealItemsQuery = `
+            SELECT DATE(m.meal_datetime) as date, mp.product_id, mp.product_amount, mp.recipe_id, mp.servings_consumed, p.calories AS p_cal
+            FROM meal m
+            JOIN MealProduct mp ON m.id = mp.meal_id
+            LEFT JOIN product p ON mp.product_id = p.id AND mp.recipe_id IS NULL
+            WHERE m.user_id = ?
+            AND DATE(m.meal_datetime) BETWEEN ? AND ?
+            ORDER BY date ASC;
+        `;
+        const mealItems = await queryAsync(mealItemsQuery, [userId, startDate, endDate]);
+        // Debug: log all meal items fetched from the database for the range
+        console.log('[DEBUG] mealItems for range:', mealItems);
 
-            console.log('getCalorieTrend - Executing meal query with params:', [userId, date]);
-            const mealItems = await queryAsync(mealItemsQuery, [userId, date]);
-            console.log('getCalorieTrend - Meal query results:', mealItems);
+        // Fetch all activity data for the range, grouped by date
+        const activityQuery = `
+            SELECT DATE(activity_date) as date, SUM(calories_burned) as total_burned
+            FROM PhysicalActivity
+            WHERE user_id = ?
+            AND DATE(activity_date) BETWEEN ? AND ?
+            GROUP BY DATE(activity_date);
+        `;
+        const activityRows = await queryAsync(activityQuery, [userId, startDate, endDate]);
 
-            console.log('getCalorieTrend - Executing activity query with params:', [userId, date]);
-            const activitySummaryRows = await queryAsync(activityQuery, [userId, date]);
-            console.log('getCalorieTrend - Activity query results:', activitySummaryRows);
+        // Group meal items by date using the raw string from MySQL to avoid timezone issues
+        const mealMap = new Map();
+        for (const item of mealItems) {
+            const date = typeof item.date === 'string'
+                ? item.date.slice(0, 10)
+                : item.date.toISOString().slice(0, 10);
+            if (!mealMap.has(date)) mealMap.set(date, []);
+            mealMap.get(date).push(item);
+        }
 
-            // Calculate consumed calories from products and recipes
-            let consumedKcal = 0;
-            const recipeIds = [...new Set((mealItems || []).filter(item => item.recipe_id).map(item => item.recipe_id))];
-            
-            console.log('getCalorieTrend - Found recipe IDs:', recipeIds);
-            
-            let recipesFullDetails = {};
-            if (recipeIds.length > 0) {
-                try {
-                    recipesFullDetails = await new Promise((resolve, reject) => {
-                        getRecipeDetailsWithNutrition(recipeIds, (err, details) => {
-                            if (err) {
-                                console.error('getCalorieTrend - Error getting recipe details:', err);
-                                return reject(err);
-                            }
-                            resolve(details || {});
-                        });
+        // Map activity burned calories by date
+        const activityMap = new Map();
+        for (const row of activityRows) {
+            const date = row.date.toISOString ? row.date.toISOString().slice(0, 10) : String(row.date).slice(0, 10);
+            activityMap.set(date, Math.round(row.total_burned || 0));
+        }
+
+        // Collect all unique recipe IDs for the range
+        const allRecipeIds = Array.from(mealMap.values()).flat().filter(i => i.recipe_id).map(i => i.recipe_id);
+        const uniqueRecipeIds = [...new Set(allRecipeIds)];
+        let recipesFullDetails = {};
+        if (uniqueRecipeIds.length > 0) {
+            try {
+                recipesFullDetails = await new Promise((resolve, reject) => {
+                    getRecipeDetailsWithNutrition(uniqueRecipeIds, (err, details) => {
+                        if (err) return reject(err);
+                        resolve(details || {});
                     });
-                    console.log('getCalorieTrend - Recipe details:', recipesFullDetails);
-                } catch (recipeError) {
-                    console.error('getCalorieTrend - Error fetching recipe details:', recipeError);
-                    // Continue processing even if recipe details fail
-                }
+                });
+            } catch (err) {
+                console.error('getCalorieTrend - Error fetching recipe details:', err);
             }
+        }
 
-            // Process each meal item
-            (mealItems || []).forEach(item => {
+        // Build daily results for each date in the range
+        const dailyDataResults = allDates.map(date => {
+            const items = mealMap.get(date) || [];
+            let consumedKcal = 0;
+            for (const item of items) {
                 if (item.product_id && item.p_cal !== null) {
                     consumedKcal += (parseFloat(item.product_amount || 0) / 100.0) * parseFloat(item.p_cal);
                 } else if (item.recipe_id && recipesFullDetails[item.recipe_id]) {
@@ -233,16 +237,23 @@ exports.getCalorieTrend = async (req, res) => {
                         consumedKcal += (recipeData.total_recipe_kcal || 0) * servingsRatio;
                     }
                 }
-            });
-
-            dailyDataResults.push({
-                date: date,
+            }
+            return {
+                date,
                 consumed: Math.round(consumedKcal),
-                burned: Math.round(activitySummaryRows[0]?.total_burned || 0)
-            });
-        }
+                burned: activityMap.get(date) || 0
+            };
+        });
 
-        console.log('getCalorieTrend - Final results:', dailyDataResults);
+        // Debug: log all expected dates in the range
+        console.log('[getCalorieTrend] allDates:', allDates);
+        // Debug: log which dates have meal items
+        console.log('[getCalorieTrend] mealMap keys:', Array.from(mealMap.keys()));
+        // Debug: log which dates have activity entries
+        console.log('[getCalorieTrend] activityMap keys:', Array.from(activityMap.keys()));
+        // Debug: log the final daily data results
+        console.log('[getCalorieTrend] dailyDataResults:', dailyDataResults);
+
         res.json(dailyDataResults);
     } catch (error) {
         console.error("getCalorieTrend - Error:", error);
@@ -302,10 +313,9 @@ exports.getPeriodSummary = async (req, res) => {
                 JOIN MealProduct mp ON m.id = mp.meal_id 
                 LEFT JOIN product p ON mp.product_id = p.id AND mp.recipe_id IS NULL 
                 WHERE m.user_id = ? 
-                AND m.meal_datetime >= ? 
-                AND m.meal_datetime < DATE_ADD(?, INTERVAL 1 DAY);
+                AND DATE(m.meal_datetime) = ?;
             `;
-            const mealItems = await queryAsync(mealItemsQuery, [userId, date, date]);
+            const mealItems = await queryAsync(mealItemsQuery, [userId, date]);
             let dailyConsumedKcal = 0, dailyProtein = 0, dailyFat = 0, dailyCarbs = 0;
 
             if (mealItems.length > 0) daysWithFoodLog++;
@@ -343,7 +353,7 @@ exports.getPeriodSummary = async (req, res) => {
             totalConsumedKcal += dailyConsumedKcal; totalProtein += dailyProtein; totalFat += dailyFat; totalCarbs += dailyCarbs;
 
             // Fetch and process activity data
-            const activityQuery = `SELECT SUM(calories_burned) as total_burned FROM PhysicalActivity WHERE user_id = ? AND activity_date = ?;`;
+            const activityQuery = `SELECT SUM(calories_burned) as total_burned FROM PhysicalActivity WHERE user_id = ? AND DATE(activity_date) = ?;`;
             const activitySummaryRows = await queryAsync(activityQuery, [userId, date]);
             const dailyBurned = parseFloat(activitySummaryRows[0]?.total_burned || 0);
 
@@ -394,8 +404,21 @@ exports.getMacronutrientDistribution = async (req, res) => {
     let totalProteinGrams = 0, totalFatGrams = 0, totalCarbsGrams = 0;
     try {
         for (const date of datesInRange) {
-            const mealItemsQuery = `SELECT mp.product_id, mp.product_amount, mp.recipe_id, mp.servings_consumed, p.protein AS p_pro, p.fat AS p_fat, p.carbs AS p_carb FROM meal m JOIN MealProduct mp ON m.id = mp.meal_id LEFT JOIN product p ON mp.product_id = p.id AND mp.recipe_id IS NULL WHERE m.user_id = ? AND DATE(m.meal_datetime) = ?;`;
-            const mealItems = await queryAsync(mealItemsQuery, [userId, date]);
+            const mealItemsQuery = `
+                SELECT mp.product_id, mp.product_amount, mp.recipe_id, mp.servings_consumed, p.protein AS p_pro, p.fat AS p_fat, p.carbs AS p_carb 
+                FROM meal m 
+                JOIN MealProduct mp ON m.id = mp.meal_id 
+                LEFT JOIN product p ON mp.product_id = p.id AND mp.recipe_id IS NULL 
+                WHERE m.user_id = ? 
+                AND DATE(m.meal_datetime) BETWEEN ? AND ?;
+            `;
+            const activityQuery = `
+                SELECT SUM(calories_burned) as total_burned 
+                FROM PhysicalActivity 
+                WHERE user_id = ? 
+                AND DATE(activity_date) BETWEEN ? AND ?;
+            `;
+            const mealItems = await queryAsync(mealItemsQuery, [userId, date, date]);
             const recipeIds = [...new Set(mealItems.filter(item => item.recipe_id).map(item => item.recipe_id))];
             const recipesFullDetails = await new Promise((resolve, reject) => {
                 if (recipeIds.length > 0) getRecipeDetailsWithNutrition(recipeIds, (err, d) => err ? reject(err) : resolve(d));

@@ -12,6 +12,7 @@ const dbSingleton = {
                 user: 'root',
                 password: '',
                 database: 'CaloriesTracker',
+                dateStrings: true // Ensure DATETIME fields are returned as strings
             });
 
             // Connect to the database
