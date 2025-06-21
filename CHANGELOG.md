@@ -1,5 +1,45 @@
 # Changelog
 
+## Version 0.9.3
+
+### Major Changes
+- Enhanced AdviceBox with server-side advice generation
+- Added dynamic advice system that adapts to user actions
+- Improved advice personalization based on user profile and diary data
+- Added support for user-defined target calories in advice calculations
+
+### Frontend Changes
+- Updated AdviceBox component to fetch advice from server via API
+- Added loading states and error handling for advice requests
+- Improved user experience with fallback messages when advice is unavailable
+- Enhanced advice display with better styling and animations
+
+### Backend Changes
+- Created new advice engine system (`server/src/utils/adviceEngine.js`)
+- Added advice controller and routes (`/api/advice`)
+- Implemented comprehensive advice bank with 40+ dynamic advice rules
+- Added support for user-defined target calories override
+- Enhanced advice filtering based on user actions (fruits, vegetables, protein variety, etc.)
+
+### New Features
+- **Dynamic Advice System**: Advice changes based on what user has eaten
+- **Contextual Praise**: System praises users for good choices (e.g., adding fruits/vegetables)
+- **Goal-Specific Advice**: Tailored advice for weight loss, gain, and maintenance goals
+- **Activity-Based Advice**: Post-workout nutrition suggestions
+- **Meal Timing Analysis**: Advice based on meal patterns and timing
+- **Nutritional Balance Detection**: Praise for balanced macronutrient intake
+
+### Technical Improvements
+- Professional English documentation and comments
+- Robust error handling in advice generation
+- Optimized advice filtering and sorting by priority
+- Enhanced code maintainability and readability
+
+### Documentation
+- Updated changelog with version 0.9.3 information
+- Added comprehensive JSDoc documentation for advice engine
+- Improved code comments and structure
+
 ## Version 0.9.2
 
 ### Major Changes

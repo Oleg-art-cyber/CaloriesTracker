@@ -20,6 +20,7 @@ const statisticsRoutes = require('./routes/statistics');
 const adminStatisticsRoutes = require('./routes/adminStatistics');
 const adminUserRoutes = require('./routes/adminUsers');
 const userRoutes = require('./routes/users');
+const adviceRoutes = require('./routes/advice');
 
 // Initialize Express application
 const app  = express();
@@ -43,6 +44,7 @@ app.use('/api/statistics', statisticsRoutes);
 app.use('/api/admin', adminStatisticsRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/advice', adviceRoutes);
 
 // Health check endpoint
 app.get('/', (_req, res) => res.json({ message: 'Server is operational.' }));
