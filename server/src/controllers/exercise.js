@@ -315,7 +315,7 @@ exports.getOneExercise = (req, res) => {
             e.is_public, 
             e.created_at, 
             e.updated_at,
-            u.username as creator_name
+            u.name as creator_name
         FROM ExerciseDefinition e
         LEFT JOIN User u ON e.created_by = u.id
         WHERE e.id = ?

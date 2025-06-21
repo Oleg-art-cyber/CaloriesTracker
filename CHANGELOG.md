@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.9.3.1
+
+### Bug Fixes
+- **Fixed Exercise Editing Issue**: Corrected SQL query in exercise controller that was causing "Unknown column 'u.username'" error
+  - Changed `u.username as creator_name` to `u.name as creator_name` in `getOneExercise` function
+  - This fixes the issue where admins and users couldn't edit exercises due to database column mismatch
+  - Affected file: `server/src/controllers/exercise.js`
+
+### Technical Improvements
+- Fixed database column reference in User table JOIN queries
+- Improved error handling for exercise management operations
+- Enhanced exercise editing functionality for all user roles
+
 ## Version 0.9.3
 
 ### Major Changes
@@ -139,3 +152,50 @@ This version introduces a comprehensive Achievements system, an enhanced User Pr
     *   Stabilized `useEffect` hooks responsible for data fetching in various components (e.g., `AddItemModal`, `RecipeForm`) to prevent infinite request loops by refining dependency arrays and adding "loaded" flags.
 *   **Server-Side SQL & Logic:**
     *   Corrected `ER_BAD_FIELD_ERROR: Unknown column 'pa.user_id'` in `
+
+## [0.9.4] - 2025-01-20
+
+### Added
+* **Expanded Achievement System**: Completely redesigned achievement system with 28 achievements across 7 categories
+  * **Getting Started (4 achievements)**: First meal logged, account creation, first activity, goal setting
+  * **Consistency (4 achievements)**: 7, 14, and 30-day food tracking streaks, 7-day activity streak
+  * **Nutrition (4 achievements)**: Protein targets, calorie balance, macro mastery, food variety
+  * **Activity (4 achievements)**: Daily calorie burn milestones, endurance workouts, weekly exercise goals
+  * **Foodie (4 achievements)**: Recipe creation milestones, meal planning, using own recipes
+  * **Profile (4 achievements)**: Profile completion, data updates, weight tracking milestones
+  * **Habits (4 achievements)**: Early breakfast, consistent meal times, complete meal logging
+* **Enhanced Achievement Logic**: Comprehensive server-side achievement checking with 20+ different criteria types
+  * Consecutive day tracking for food, activity, and weight logging
+  * Macro and calorie target achievement checking
+  * Recipe creation and usage tracking
+  * Meal timing and variety analysis
+  * Profile completion and update detection
+* **Real-time Achievement Awarding**: Achievements are now checked and awarded automatically when users:
+  * Log meals and activities
+  * Create recipes
+  * Update profiles
+  * Log weight entries
+  * Load diary data
+
+### Technical Improvements
+* **Robust Achievement Controller**: Expanded `checkAndAwardAchievements` function with 20+ achievement types
+* **Helper Functions**: Added specialized functions for consecutive day calculations, macro analysis, and meal pattern detection
+* **Database Integration**: All achievement checks use real database data (no placeholder achievements)
+* **Error Handling**: Comprehensive error handling for achievement checking with detailed logging
+* **Performance**: Asynchronous achievement checking to avoid blocking user actions
+
+### Database Changes
+* Updated `AchievementDefinition` table with 28 new realistic achievements
+* All achievements based on actual available data (no water/hydration tracking)
+* Proper categorization and point allocation system
+* Updated AUTO_INCREMENT to 29
+
+### Files Modified
+* `server/src/controllers/achievements.js` - Complete rewrite with 20+ achievement types
+* `server/src/controllers/physicalActivity.js` - Added achievement checking
+* `server/src/controllers/recipes.js` - Added achievement checking
+* `server/src/controllers/profile.js` - Added achievement checking for profile updates and weight logging
+* `CaloriesTracker-13.sql` - Updated with new achievement definitions
+* `achievements_insert.sql` - New SQL file for local database updates
+
+## [0.9.3] - 2025-01-20

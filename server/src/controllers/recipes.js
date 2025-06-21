@@ -5,6 +5,7 @@
  */
 const dbSingleton = require('../config/dbSingleton'); // Path to db connection singleton
 const conn = dbSingleton.getConnection();
+const { checkAndAwardAchievements } = require('./achievements'); // Import achievement checker
 
 /**
  * Retrieves all recipes available to the user
@@ -211,6 +212,13 @@ exports.createRecipe = (req, res) => {
                             res.status(500).json({ error: 'Failed to finalize recipe creation (commit).', details: commitErr.code });
                         });
                     }
+                    
+                    // Check for achievements asynchronously
+                    checkAndAwardAchievements(user_id, {
+                        type: 'RECIPE_CREATED',
+                        data: { recipe_id: recipeId, ingredient_count: ingredients.length }
+                    }).catch(achErr => console.error("[RecipesCtrl] Error during achievement check after recipe creation:", achErr));
+                    
                     const pseudoReqForGet = { params: { id: recipeId }, user: req.user };
                     exports.getRecipeById(pseudoReqForGet, res); // Respond with the complete new recipe
                 });

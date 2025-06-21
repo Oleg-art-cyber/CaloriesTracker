@@ -5,6 +5,7 @@
  */
 const dbSingleton = require('../config/dbSingleton');
 const conn = dbSingleton.getConnection();
+const { checkAndAwardAchievements } = require('./achievements'); // Import achievement checker
 
 /**
  * Logs a new physical activity for the user
@@ -91,6 +92,18 @@ exports.logActivity = (req, res) => {
                     console.error("logActivity - SQL Error (insert activity):", insertErr.code, insertErr.sqlMessage, insertErr);
                     return res.status(500).json({ error: 'Failed to log physical activity.', details: insertErr.code });
                 }
+                
+                // Check for achievements asynchronously
+                checkAndAwardAchievements(currentUserId, {
+                    type: 'ACTIVITY_LOGGED',
+                    data: { 
+                        activity_date: activity_date, 
+                        duration_minutes: numDuration, 
+                        calories_burned: caloriesBurned,
+                        exercise_definition_id: numExerciseDefId
+                    }
+                }).catch(achErr => console.error("[PhysicalActivityCtrl] Error during achievement check after activity log:", achErr));
+                
                 res.status(201).json({
                     id: result.insertId,
                     user_id: currentUserId,

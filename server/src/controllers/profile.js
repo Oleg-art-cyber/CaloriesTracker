@@ -2,6 +2,7 @@
 const dbSingleton = require('../config/dbSingleton'); // Adjust path to your dbSingleton
 const conn = dbSingleton.getConnection();
 const { getCalculatedCalorieDetails } = require('../utils/calorieCalculator');
+const { checkAndAwardAchievements } = require('./achievements'); // Import achievement checker
 
 /**
  * Profile Controller
@@ -175,10 +176,28 @@ exports.updateProfile = (req, res) => {
                                     res.status(500).json({ error: 'Failed to log weight history.' });
                                 });
                             }
-                            commitAndRespond();
+                            
+                            // Check if this is the first weight log for this user
+                            const checkFirstWeightQuery = 'SELECT COUNT(*) as count FROM weight_log WHERE user_id = ?';
+                            conn.query(checkFirstWeightQuery, [userId], (checkErr, checkResult) => {
+                                if (checkErr) {
+                                    console.error("updateProfile - SQL Error (check first weight):", checkErr);
+                                } else {
+                                    // Check for achievements asynchronously - this is a weight log
+                                    console.log(`[ProfileCtrl] Checking achievements for weight log. First weight log: ${checkResult[0].count === 1}, Weight: ${fieldsToUpdate.weight}`);
+                                    checkAndAwardAchievements(userId, {
+                                        type: 'WEIGHT_LOGGED',
+                                        data: { 
+                                            first_weight_log: checkResult[0].count === 1, // true if this is the first weight log
+                                            weight: fieldsToUpdate.weight 
+                                        }
+                                    }).catch(achErr => console.error("[ProfileCtrl] Error during achievement check for weight log:", achErr));
+                                }
+                                commitAndRespond(newWeightProvided);
+                            });
                         });
                     } else {
-                        commitAndRespond();
+                        commitAndRespond(newWeightProvided);
                     }
                 });
 
@@ -186,7 +205,7 @@ exports.updateProfile = (req, res) => {
                  * Commits the transaction and returns the updated profile
                  * Handles any commit errors and rolls back if necessary
                  */
-                function commitAndRespond() {
+                function commitAndRespond(weightLogged) {
                     conn.commit(commitErr => {
                         if (commitErr) {
                             return conn.rollback(() => {
@@ -208,6 +227,16 @@ exports.updateProfile = (req, res) => {
                                 console.error("updateProfile - SQL Error (fetch updated profile):", selectErr);
                                 return res.status(500).json({ error: "Profile updated, but failed to retrieve current data."});
                             }
+                            
+                            // Check for achievements asynchronously
+                            checkAndAwardAchievements(userId, {
+                                type: 'PROFILE_UPDATED',
+                                data: { 
+                                    weight_logged: weightLogged,
+                                    profile_complete: updatedUserRows[0].weight && updatedUserRows[0].height && updatedUserRows[0].age && updatedUserRows[0].goal && updatedUserRows[0].gender && updatedUserRows[0].activity_level
+                                }
+                            }).catch(achErr => console.error("[ProfileCtrl] Error during achievement check after profile update:", achErr));
+                            
                             res.json(updatedUserRows[0]);
                         });
                     });
